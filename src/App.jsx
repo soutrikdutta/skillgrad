@@ -41,7 +41,6 @@ function CompanyPlatform({ onSwitchRole }) {
       <Navbar currentRole="company" onSwitchRole={onSwitchRole} />
       <main className="pt-18">
         <CompanyDashboard />
-        <Opportunities />
         <ContactUs />
       </main>
       <Footer />

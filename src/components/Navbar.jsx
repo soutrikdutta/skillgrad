@@ -78,10 +78,7 @@ export default function Navbar({ currentRole = 'student', onSwitchRole }) {
             // Company Navigation Links
             <>
               <button onClick={() => scrollTo('company-dashboard')} className="hover:text-white transition-colors cursor-pointer font-semibold text-cyan-300">
-                Dashboard
-              </button>
-              <button onClick={() => scrollTo('opportunities')} className="hover:text-white transition-colors cursor-pointer">
-                Live Marketplace
+                Recruitment Dashboard
               </button>
               <button onClick={() => scrollTo('contact')} className="hover:text-white transition-colors cursor-pointer">
                 Support
@@ -165,7 +162,6 @@ export default function Navbar({ currentRole = 'student', onSwitchRole }) {
             ) : (
               <>
                 <button onClick={() => scrollTo('company-dashboard')} className="text-left text-cyan-300">Recruitment Dashboard</button>
-                <button onClick={() => scrollTo('opportunities')} className="text-left text-slate-200">Live Marketplace</button>
                 <button onClick={() => scrollTo('contact')} className="text-left text-slate-200">Support</button>
               </>
             )}
