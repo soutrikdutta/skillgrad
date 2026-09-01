@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import RoleSelectScreen from './components/RoleSelectScreen';
 import LoginPage from './components/LoginPage';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
@@ -15,7 +16,7 @@ import ToastContainer from './components/Toast';
 
 function MainPlatform({ onRequireAuth }) {
   return (
-    <div className="min-h-screen bg-[#080C14] text-slate-100 selection:bg-indigo-500/30 selection:text-indigo-200">
+    <div className="min-h-screen bg-[#06090F] text-slate-100 selection:bg-indigo-500/30 selection:text-indigo-200">
       <Navbar />
       <main>
         <Hero />
@@ -37,26 +38,45 @@ function MainPlatform({ onRequireAuth }) {
 
 function AppContent() {
   const { user, loading } = useAuth();
+  const [selectedRole, setSelectedRole] = useState(null); // null | 'student' | 'company'
   const [isGuest, setIsGuest] = useState(false);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#080C14] flex items-center justify-center text-white">
+      <div className="min-h-screen bg-[#06090F] flex items-center justify-center text-white">
         <div className="w-8 h-8 border-3 border-primary-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
-  // If not authenticated and not in guest mode, show the initial LoginPage
-  if (!user && !isGuest) {
+  // 1. If not authenticated and no role selected yet, show Role Selection Screen first
+  if (!user && !isGuest && !selectedRole) {
     return (
       <>
-        <LoginPage onContinueAsGuest={() => setIsGuest(true)} />
+        <RoleSelectScreen 
+          onSelectRole={(role) => setSelectedRole(role)}
+          onContinueAsGuest={() => setIsGuest(true)}
+        />
         <ToastContainer />
       </>
     );
   }
 
+  // 2. Once role is selected, open the tailored Login/Signup view for that role
+  if (!user && !isGuest && selectedRole) {
+    return (
+      <>
+        <LoginPage 
+          selectedRole={selectedRole}
+          onBackToRoles={() => setSelectedRole(null)}
+          onContinueAsGuest={() => setIsGuest(true)}
+        />
+        <ToastContainer />
+      </>
+    );
+  }
+
+  // 3. Authenticated or Guest Platform
   return <MainPlatform onRequireAuth={() => setIsGuest(false)} />;
 }
 

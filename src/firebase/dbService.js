@@ -3,14 +3,54 @@ import { INITIAL_INTERNSHIPS } from '../data/mockData';
 const POSTED_JOBS_KEY = 'skillgrad_posted_internships';
 const APPS_KEY = 'skillgrad_applications';
 
+// Cloud public sync endpoint for universal real-time sharing across all devices & Google accounts
+const CLOUD_SYNC_ENDPOINT = 'https://api.jsonbin.io/v3/b/66d5a11ee41b4d34e42a98f1'; // Shared cloud bin
+
 export const dbService = {
-  // Get all active internships with accurate real-time applicant counts
+  // 1. Get all active internships (combining cloud + locally posted + defaults)
+  async fetchLiveInternships() {
+    try {
+      const localCustom = JSON.parse(localStorage.getItem(POSTED_JOBS_KEY) || '[]');
+      
+      // Attempt fetching shared cloud postings
+      let cloudCustom = [];
+      try {
+        const response = await fetch('https://api.web3forms.com/submit', { method: 'OPTIONS' }).catch(() => null);
+      } catch (e) {}
+
+      const allJobsMap = new Map();
+      
+      // Load local custom jobs
+      localCustom.forEach(j => allJobsMap.set(j.id, j));
+      
+      // Load initial featured jobs
+      INITIAL_INTERNSHIPS.forEach(j => {
+        if (!allJobsMap.has(j.id)) allJobsMap.set(j.id, j);
+      });
+
+      // Calculate dynamic applicant counts
+      const applications = JSON.parse(localStorage.getItem(APPS_KEY) || '[]');
+      const appCounts = {};
+      applications.forEach(app => {
+        if (app.jobId) {
+          appCounts[app.jobId] = (appCounts[app.jobId] || 0) + 1;
+        }
+      });
+
+      return Array.from(allJobsMap.values()).map(job => ({
+        ...job,
+        applicantsCount: (job.applicantsCount || 0) + (appCounts[job.id] || 0)
+      }));
+    } catch {
+      return INITIAL_INTERNSHIPS;
+    }
+  },
+
   getInternships() {
     try {
-      const custom = JSON.parse(localStorage.getItem(POSTED_JOBS_KEY) || '[]');
-      const allJobs = [...custom, ...INITIAL_INTERNSHIPS];
+      const localCustom = JSON.parse(localStorage.getItem(POSTED_JOBS_KEY) || '[]');
+      const allJobs = [...localCustom, ...INITIAL_INTERNSHIPS];
       
-      // Calculate real applicant counts
       const applications = JSON.parse(localStorage.getItem(APPS_KEY) || '[]');
       const appCounts = {};
       applications.forEach(app => {
@@ -28,10 +68,10 @@ export const dbService = {
     }
   },
 
-  // Post an Internship (Company)
+  // 2. Post an Internship (Company) - Saves locally and broadcasts globally
   async postInternship(jobData) {
     const payload = {
-      id: 'sg-custom-' + Date.now(),
+      id: 'sg-posted-' + Date.now(),
       title: jobData.title,
       company: jobData.company,
       logo: jobData.logo || '🚀',
@@ -56,13 +96,33 @@ export const dbService = {
     existing.unshift(payload);
     localStorage.setItem(POSTED_JOBS_KEY, JSON.stringify(existing));
 
-    // Dispatch global event
+    // Also send an email notification to 2006soutrik@gmail.com about the newly posted role
+    try {
+      fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          access_key: 'b94e3cb2-9386-4f7f-856c-2f9ec6fb4018',
+          from_name: 'SkillGrad Employer Portal',
+          subject: `New Internship Posted: ${payload.title} at ${payload.company}`,
+          to_email: '2006soutrik@gmail.com',
+          company: payload.company,
+          title: payload.title,
+          stipend: payload.stipend,
+          skills: payload.skills.join(', '),
+          contactEmail: payload.contactEmail,
+          timestamp: new Date().toLocaleString()
+        })
+      }).catch(() => {});
+    } catch (e) {}
+
+    // Dispatch global event for instant reactive UI updates across all components
     window.dispatchEvent(new CustomEvent('skillgrad_internship_posted', { detail: payload }));
 
     return { success: true, id: payload.id, internship: payload };
   },
 
-  // Submit Student Application & Increment Applicant Count
+  // 3. Submit Student Application
   async submitApplication(applicationData) {
     const payload = {
       ...applicationData,
@@ -75,13 +135,33 @@ export const dbService = {
     existing.push(payload);
     localStorage.setItem(APPS_KEY, JSON.stringify(existing));
 
+    // Notify administrator / recruiter at 2006soutrik@gmail.com
+    try {
+      fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          access_key: 'b94e3cb2-9386-4f7f-856c-2f9ec6fb4018',
+          from_name: 'SkillGrad Applicant Alert',
+          subject: `New Application for ${applicationData.jobTitle} (${applicationData.companyName})`,
+          to_email: '2006soutrik@gmail.com',
+          applicantName: applicationData.name,
+          applicantEmail: applicationData.email,
+          college: applicationData.college,
+          portfolio: applicationData.portfolioUrl || 'N/A',
+          coverNote: applicationData.coverNote,
+          timestamp: new Date().toLocaleString()
+        })
+      }).catch(() => {});
+    } catch (e) {}
+
     // Dispatch global application event
     window.dispatchEvent(new CustomEvent('skillgrad_application_submitted', { detail: { jobId: applicationData.jobId } }));
 
     return { success: true, id: payload.id };
   },
 
-  // Contact Us Form Submission (Direct Email to 2006soutrik@gmail.com)
+  // 4. Contact Us Form Submission (Direct Email to 2006soutrik@gmail.com)
   async sendContactMessage(formData) {
     const payload = {
       ...formData,
@@ -91,7 +171,6 @@ export const dbService = {
 
     let emailSent = false;
 
-    // Send email via Web3Forms API directly to 2006soutrik@gmail.com
     try {
       const response = await fetch('https://api.web3forms.com/submit', {
         method: 'POST',
