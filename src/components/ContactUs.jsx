@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { dbService } from '../firebase/dbService';
 import { useAuth } from '../context/AuthContext';
 import confetti from 'canvas-confetti';
-import { Mail, Phone, MapPin, Send, CheckCircle2, MessageSquare, Clock } from 'lucide-react';
+import { Mail, Clock, Send, AlertCircle } from 'lucide-react';
 
 export default function ContactUs() {
   const { addToast } = useAuth();
@@ -14,29 +14,49 @@ export default function ContactUs() {
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  const validate = () => {
+    if (!name.trim() || name.trim().length < 2) {
+      setFormError('Please enter your full name (minimum 2 characters).');
+      return false;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email.trim() || !emailRegex.test(email.trim())) {
+      setFormError('Please enter a valid email address.');
+      return false;
+    }
+    if (!message.trim() || message.trim().length < 10) {
+      setFormError('Please write a message with at least 10 characters.');
+      return false;
+    }
+    return true;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name || !email || !message) {
-      addToast('Please complete all required fields', 'error');
+    setFormError('');
+
+    if (!validate()) {
+      addToast('Please complete all required fields correctly.', 'error');
       return;
     }
 
     setIsSending(true);
     try {
       const res = await dbService.sendContactMessage({
-        name,
-        email,
-        phone,
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
         role,
-        subject: subject || 'General Inquiry',
-        message
+        subject: subject.trim() || 'General Inquiry',
+        message: message.trim()
       });
 
       if (res.success) {
         setIsSubmitted(true);
         confetti({ particleCount: 70, spread: 60 });
-        addToast('Message dispatched to 2006soutrik@gmail.com!', 'success');
+        addToast('Message dispatched directly to 2006soutrik@gmail.com!', 'success');
       }
     } catch (err) {
       addToast('Error sending message. Please try again.', 'error');
@@ -47,13 +67,13 @@ export default function ContactUs() {
 
   return (
     <section id="contact" className="py-24 relative">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
           
           {/* Left Info Column */}
           <div className="lg:col-span-5 space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-500/10 border border-primary-500/20 text-xs font-semibold text-primary-400">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-primary-500/10 border border-primary-500/30 text-xs font-semibold text-primary-400 backdrop-blur-md">
               <Mail className="w-3.5 h-3.5" />
               Get in Touch
             </div>
@@ -63,27 +83,27 @@ export default function ContactUs() {
             </h2>
 
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              Whether you are a student looking for tailored guidance, a university coordinator, or an employer seeking to hire, our team is here to assist.
+              Whether you are an aspiring student, university coordinator, or employer seeking talent, we respond promptly.
             </p>
 
-            <div className="space-y-4 pt-4">
-              <div className="flex items-center gap-3 p-4 rounded-xl bg-slate-900/90 border border-slate-800">
-                <div className="w-10 h-10 rounded-xl bg-primary-600/15 border border-primary-500/30 flex items-center justify-center shrink-0">
+            <div className="space-y-4 pt-2">
+              <div className="flex items-center gap-3 p-4 rounded-2xl glass-panel">
+                <div className="w-10 h-10 rounded-xl bg-primary-600/20 border border-primary-500/30 flex items-center justify-center shrink-0">
                   <Mail className="w-5 h-5 text-primary-400" />
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold uppercase text-slate-400">Primary Support Email</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Direct Support Email</span>
                   <p className="text-xs sm:text-sm font-semibold text-white font-mono">2006soutrik@gmail.com</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 p-4 rounded-xl bg-slate-900/90 border border-slate-800">
-                <div className="w-10 h-10 rounded-xl bg-emerald-600/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
+              <div className="flex items-center gap-3 p-4 rounded-2xl glass-panel">
+                <div className="w-10 h-10 rounded-xl bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
                   <Clock className="w-5 h-5 text-emerald-400" />
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold uppercase text-slate-400">Response Time</span>
-                  <p className="text-xs sm:text-sm font-semibold text-slate-200">Usually under 24 hours</p>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Response Turnaround</span>
+                  <p className="text-xs sm:text-sm font-semibold text-slate-200">Within 24 hours</p>
                 </div>
               </div>
             </div>
@@ -91,7 +111,7 @@ export default function ContactUs() {
 
           {/* Right Form Card */}
           <div className="lg:col-span-7">
-            <div className="glass-panel p-6 sm:p-8 rounded-2xl border-slate-700/80 shadow-2xl">
+            <div className="glass-panel p-6 sm:p-8 rounded-3xl">
               
               {isSubmitted ? (
                 <div className="text-center py-10 space-y-4">
@@ -100,11 +120,15 @@ export default function ContactUs() {
                   </div>
                   <h3 className="text-2xl font-bold font-display text-white">Message Delivered!</h3>
                   <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto">
-                    Thank you, <strong className="text-white">{name}</strong>. Your inquiry has been forwarded directly to <strong className="text-white font-mono">2006soutrik@gmail.com</strong> and logged into the SkillGrad database.
+                    Thank you, <strong className="text-white">{name}</strong>. Your inquiry has been forwarded directly to <strong className="text-white font-mono">2006soutrik@gmail.com</strong>.
                   </p>
                   <button
                     onClick={() => {
                       setIsSubmitted(false);
+                      setName('');
+                      setEmail('');
+                      setPhone('');
+                      setSubject('');
                       setMessage('');
                     }}
                     className="px-6 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold"
@@ -113,7 +137,15 @@ export default function ContactUs() {
                   </button>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+                  
+                  {formError && (
+                    <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                      <span>{formError}</span>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-semibold text-slate-300 mb-1">Your Name *</label>
@@ -121,9 +153,9 @@ export default function ContactUs() {
                         type="text"
                         required
                         value={name}
-                        onChange={(e) => setName(e.target.value)}
+                        onChange={(e) => { setName(e.target.value); setFormError(''); }}
                         placeholder="John Doe"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-primary-500"
+                        className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs sm:text-sm"
                       />
                     </div>
 
@@ -133,9 +165,9 @@ export default function ContactUs() {
                         type="email"
                         required
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(e) => { setEmail(e.target.value); setFormError(''); }}
                         placeholder="john@example.com"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-primary-500"
+                        className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs sm:text-sm"
                       />
                     </div>
                   </div>
@@ -146,13 +178,13 @@ export default function ContactUs() {
                       <select
                         value={role}
                         onChange={(e) => setRole(e.target.value)}
-                        className="w-full px-3 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 text-white text-xs focus:outline-none focus:border-primary-500"
+                        className="w-full px-3 py-2.5 rounded-xl glass-input text-xs"
                       >
-                        <option value="Student">Student / Learner</option>
-                        <option value="Company Recruiter">Company Recruiter</option>
-                        <option value="College Representative">College Representative</option>
-                        <option value="Mentor / Industry Lead">Mentor / Industry Lead</option>
-                        <option value="Other">Other</option>
+                        <option value="Student" className="bg-slate-900 text-white">Student / Learner</option>
+                        <option value="Company Recruiter" className="bg-slate-900 text-white">Company Recruiter</option>
+                        <option value="College Representative" className="bg-slate-900 text-white">College Representative</option>
+                        <option value="Mentor" className="bg-slate-900 text-white">Industry Mentor</option>
+                        <option value="Other" className="bg-slate-900 text-white">Other</option>
                       </select>
                     </div>
 
@@ -163,7 +195,7 @@ export default function ContactUs() {
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         placeholder="+91 9876543210"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-primary-500"
+                        className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs sm:text-sm"
                       />
                     </div>
                   </div>
@@ -174,34 +206,34 @@ export default function ContactUs() {
                       type="text"
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
-                      placeholder="e.g. Inquiry about upcoming AI internships"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-primary-500"
+                      placeholder="e.g. Question about upcoming AI internships"
+                      className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs sm:text-sm"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">Your Message *</label>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Your Message * (min. 10 characters)</label>
                     <textarea
                       rows="4"
                       required
                       value={message}
-                      onChange={(e) => setMessage(e.target.value)}
+                      onChange={(e) => { setMessage(e.target.value); setFormError(''); }}
                       placeholder="Write your message here..."
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-primary-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs sm:text-sm"
                     />
                   </div>
 
                   <button
                     type="submit"
                     disabled={isSending}
-                    className="w-full py-3.5 rounded-xl bg-gradient-to-r from-primary-600 via-indigo-600 to-purple-600 hover:from-primary-500 hover:to-purple-500 text-white font-semibold text-xs shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 disabled:opacity-60"
+                    className="w-full py-3.5 rounded-xl bg-gradient-to-r from-primary-600 via-indigo-600 to-purple-600 hover:from-primary-500 hover:to-purple-500 text-white font-semibold text-xs sm:text-sm shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
                   >
                     {isSending ? (
                       <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     ) : (
                       <>
                         <Send className="w-4 h-4" />
-                        Send Direct Message
+                        Send Direct Message to 2006soutrik@gmail.com
                       </>
                     )}
                   </button>

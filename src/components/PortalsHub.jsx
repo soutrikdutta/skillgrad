@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { dbService } from '../firebase/dbService';
 import confetti from 'canvas-confetti';
-import { GraduationCap, Building2, UserCheck, PlusCircle, CheckCircle2, ArrowRight } from 'lucide-react';
+import { GraduationCap, Building2, UserCheck, PlusCircle, CheckCircle2, ArrowRight, AlertCircle } from 'lucide-react';
 
 export default function PortalsHub() {
   const { user, addToast } = useAuth();
@@ -17,6 +17,7 @@ export default function PortalsHub() {
   const [sPortfolio, setSPortfolio] = useState('');
   const [sSubmitting, setSSubmitting] = useState(false);
   const [sDone, setSDone] = useState(false);
+  const [sError, setSError] = useState('');
 
   // Company form state
   const [cName, setCName] = useState('');
@@ -30,20 +31,48 @@ export default function PortalsHub() {
   const [cDesc, setCDesc] = useState('');
   const [cSubmitting, setCSubmitting] = useState(false);
   const [cDone, setCDone] = useState(false);
+  const [cError, setCError] = useState('');
+
+  const validateStudent = () => {
+    if (!sName.trim() || sName.trim().length < 2) {
+      setSError('Please enter your full name (at least 2 characters).');
+      return false;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!sEmail.trim() || !emailRegex.test(sEmail.trim())) {
+      setSError('Please enter a valid email address.');
+      return false;
+    }
+    if (!sCollege.trim()) {
+      setSError('Please enter your College or University name.');
+      return false;
+    }
+    if (!sSkills.trim()) {
+      setSError('Please list at least one skill.');
+      return false;
+    }
+    return true;
+  };
 
   const handleStudentSubmit = async (e) => {
     e.preventDefault();
-    if (!sName || !sEmail) return addToast('Please enter your name and email', 'error');
+    setSError('');
+
+    if (!validateStudent()) {
+      addToast('Please complete all required fields.', 'error');
+      return;
+    }
+
     setSSubmitting(true);
     try {
       await dbService.submitApplication({
         type: 'student_profile',
-        name: sName,
-        email: sEmail,
-        college: sCollege,
+        name: sName.trim(),
+        email: sEmail.trim(),
+        college: sCollege.trim(),
         domain: sDomain,
         skills: sSkills.split(',').map(s => s.trim()).filter(Boolean),
-        portfolioUrl: sPortfolio
+        portfolioUrl: sPortfolio.trim()
       });
       setSDone(true);
       confetti({ particleCount: 60, spread: 60 });
@@ -55,21 +84,56 @@ export default function PortalsHub() {
     }
   };
 
+  const validateCompany = () => {
+    if (!cName.trim() || cName.trim().length < 2) {
+      setCError('Please enter your company / startup name.');
+      return false;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!cEmail.trim() || !emailRegex.test(cEmail.trim())) {
+      setCError('Please enter a valid company contact email.');
+      return false;
+    }
+    if (!cTitle.trim() || cTitle.trim().length < 3) {
+      setCError('Please enter a valid internship title.');
+      return false;
+    }
+    if (!cStipend.trim()) {
+      setCError('Please provide a stipend amount or range.');
+      return false;
+    }
+    if (!cSkills.trim()) {
+      setCError('Please specify required skills.');
+      return false;
+    }
+    if (!cDesc.trim() || cDesc.trim().length < 10) {
+      setCError('Please provide a brief description (min 10 characters).');
+      return false;
+    }
+    return true;
+  };
+
   const handleCompanySubmit = async (e) => {
     e.preventDefault();
-    if (!cName || !cEmail || !cTitle) return addToast('Please fill required fields', 'error');
+    setCError('');
+
+    if (!validateCompany()) {
+      addToast('Please complete all required fields.', 'error');
+      return;
+    }
+
     setCSubmitting(true);
     try {
       await dbService.postInternship({
-        company: cName,
-        contactEmail: cEmail,
-        title: cTitle,
+        company: cName.trim(),
+        contactEmail: cEmail.trim(),
+        title: cTitle.trim(),
         domain: cDomain,
-        stipend: cStipend,
+        stipend: cStipend.trim(),
         duration: cDuration,
-        location: cLocation,
+        location: cLocation.trim(),
         skills: cSkills.split(',').map(s => s.trim()).filter(Boolean),
-        description: cDesc
+        description: cDesc.trim()
       });
       setCDone(true);
       confetti({ particleCount: 75, spread: 70 });
@@ -105,10 +169,10 @@ export default function PortalsHub() {
           </p>
 
           {/* Segmented Tab Switcher */}
-          <div className="inline-flex p-1.5 rounded-2xl bg-slate-900 border border-slate-800 mt-6 shadow-lg">
+          <div className="inline-flex p-1.5 rounded-2xl glass-panel mt-6">
             <button
               onClick={() => setActiveTab('student')}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 ${
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer ${
                 activeTab === 'student'
                   ? 'bg-primary-600 text-white shadow-md shadow-indigo-600/30'
                   : 'text-slate-400 hover:text-slate-200'
@@ -119,7 +183,7 @@ export default function PortalsHub() {
             </button>
             <button
               onClick={() => setActiveTab('company')}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 ${
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer ${
                 activeTab === 'company'
                   ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/30'
                   : 'text-slate-400 hover:text-slate-200'
@@ -133,7 +197,7 @@ export default function PortalsHub() {
 
         {/* Tab 1: For Students */}
         {activeTab === 'student' && (
-          <div className="glass-panel p-6 sm:p-8 rounded-2xl border-slate-700/80 shadow-2xl animate-fadeIn">
+          <div className="glass-panel p-6 sm:p-8 rounded-3xl shadow-2xl animate-fadeIn">
             {sDone ? (
               <div className="text-center py-6 space-y-3">
                 <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
@@ -149,7 +213,14 @@ export default function PortalsHub() {
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleStudentSubmit} className="space-y-4">
+              <form onSubmit={handleStudentSubmit} className="space-y-4" noValidate>
+                {sError && (
+                  <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span>{sError}</span>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-slate-300 mb-1">Full Name *</label>
@@ -157,9 +228,9 @@ export default function PortalsHub() {
                       type="text"
                       required
                       value={sName}
-                      onChange={(e) => setSName(e.target.value)}
+                      onChange={(e) => { setSName(e.target.value); setSError(''); }}
                       placeholder="e.g. Aarav Sharma"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-primary-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs sm:text-sm"
                     />
                   </div>
                   <div>
@@ -168,22 +239,23 @@ export default function PortalsHub() {
                       type="email"
                       required
                       value={sEmail}
-                      onChange={(e) => setSEmail(e.target.value)}
+                      onChange={(e) => { setSEmail(e.target.value); setSError(''); }}
                       placeholder="aarav@college.edu"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-primary-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs sm:text-sm"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">College / University</label>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">College / University *</label>
                     <input
                       type="text"
+                      required
                       value={sCollege}
-                      onChange={(e) => setSCollege(e.target.value)}
+                      onChange={(e) => { setSCollege(e.target.value); setSError(''); }}
                       placeholder="e.g. Delhi University / VIT"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-primary-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs sm:text-sm"
                     />
                   </div>
                   <div>
@@ -191,26 +263,27 @@ export default function PortalsHub() {
                     <select
                       value={sDomain}
                       onChange={(e) => setSDomain(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 text-white text-xs focus:outline-none focus:border-primary-500"
+                      className="w-full px-3 py-2.5 rounded-xl glass-input text-xs"
                     >
-                      <option value="AI / Machine Learning">AI / Machine Learning</option>
-                      <option value="Web Development">Web Development</option>
-                      <option value="UI / UX Design">UI / UX Design</option>
-                      <option value="Data Science">Data Science</option>
-                      <option value="Cloud & DevOps">Cloud & DevOps</option>
+                      <option value="AI / Machine Learning" className="bg-slate-900 text-white">AI / Machine Learning</option>
+                      <option value="Web Development" className="bg-slate-900 text-white">Web Development</option>
+                      <option value="UI / UX Design" className="bg-slate-900 text-white">UI / UX Design</option>
+                      <option value="Data Science" className="bg-slate-900 text-white">Data Science</option>
+                      <option value="Cloud & DevOps" className="bg-slate-900 text-white">Cloud & DevOps</option>
                     </select>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">Key Skills (comma separated)</label>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Key Skills * (comma separated)</label>
                     <input
                       type="text"
+                      required
                       value={sSkills}
-                      onChange={(e) => setSSkills(e.target.value)}
+                      onChange={(e) => { setSSkills(e.target.value); setSError(''); }}
                       placeholder="React, Python, Tailwind, SQL"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-primary-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs sm:text-sm"
                     />
                   </div>
                   <div>
@@ -220,7 +293,7 @@ export default function PortalsHub() {
                       value={sPortfolio}
                       onChange={(e) => setSPortfolio(e.target.value)}
                       placeholder="https://github.com/yourhandle"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-primary-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs sm:text-sm"
                     />
                   </div>
                 </div>
@@ -228,7 +301,7 @@ export default function PortalsHub() {
                 <button
                   type="submit"
                   disabled={sSubmitting}
-                  className="w-full py-3 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-semibold text-xs shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 mt-2 disabled:opacity-60"
+                  className="w-full py-3.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-semibold text-xs shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 mt-2 disabled:opacity-60 cursor-pointer"
                 >
                   <UserCheck className="w-4 h-4" />
                   {sSubmitting ? 'Registering...' : 'Join Student Talent Pool'}
@@ -240,7 +313,7 @@ export default function PortalsHub() {
 
         {/* Tab 2: For Companies */}
         {activeTab === 'company' && (
-          <div className="glass-panel p-6 sm:p-8 rounded-2xl border-slate-700/80 shadow-2xl animate-fadeIn">
+          <div className="glass-panel p-6 sm:p-8 rounded-3xl shadow-2xl animate-fadeIn">
             {cDone ? (
               <div className="text-center py-6 space-y-4">
                 <CheckCircle2 className="w-12 h-12 text-cyan-400 mx-auto" />
@@ -269,7 +342,14 @@ export default function PortalsHub() {
                 </div>
               </div>
             ) : (
-              <form onSubmit={handleCompanySubmit} className="space-y-4">
+              <form onSubmit={handleCompanySubmit} className="space-y-4" noValidate>
+                {cError && (
+                  <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span>{cError}</span>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-slate-300 mb-1">Company Name *</label>
@@ -277,9 +357,9 @@ export default function PortalsHub() {
                       type="text"
                       required
                       value={cName}
-                      onChange={(e) => setCName(e.target.value)}
+                      onChange={(e) => { setCName(e.target.value); setCError(''); }}
                       placeholder="e.g. Acme Tech Labs"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-cyan-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs sm:text-sm"
                     />
                   </div>
                   <div>
@@ -288,9 +368,9 @@ export default function PortalsHub() {
                       type="email"
                       required
                       value={cEmail}
-                      onChange={(e) => setCEmail(e.target.value)}
+                      onChange={(e) => { setCEmail(e.target.value); setCError(''); }}
                       placeholder="hiring@acme.com"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-cyan-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs sm:text-sm"
                     />
                   </div>
                 </div>
@@ -302,9 +382,9 @@ export default function PortalsHub() {
                       type="text"
                       required
                       value={cTitle}
-                      onChange={(e) => setCTitle(e.target.value)}
+                      onChange={(e) => { setCTitle(e.target.value); setCError(''); }}
                       placeholder="e.g. Full Stack Web Developer Intern"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-cyan-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs sm:text-sm"
                     />
                   </div>
                   <div>
@@ -312,27 +392,28 @@ export default function PortalsHub() {
                     <select
                       value={cDomain}
                       onChange={(e) => setCDomain(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-500"
+                      className="w-full px-3 py-2.5 rounded-xl glass-input text-xs"
                     >
-                      <option value="Web Development">Web Development</option>
-                      <option value="AI / Machine Learning">AI / Machine Learning</option>
-                      <option value="UI / UX Design">UI / UX Design</option>
-                      <option value="Data Science">Data Science</option>
-                      <option value="Cloud & DevOps">Cloud & DevOps</option>
-                      <option value="Mobile App Dev">Mobile App Dev</option>
+                      <option value="Web Development" className="bg-slate-900 text-white">Web Development</option>
+                      <option value="AI / Machine Learning" className="bg-slate-900 text-white">AI / Machine Learning</option>
+                      <option value="UI / UX Design" className="bg-slate-900 text-white">UI / UX Design</option>
+                      <option value="Data Science" className="bg-slate-900 text-white">Data Science</option>
+                      <option value="Cloud & DevOps" className="bg-slate-900 text-white">Cloud & DevOps</option>
+                      <option value="Mobile App Dev" className="bg-slate-900 text-white">Mobile App Dev</option>
                     </select>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">Stipend</label>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Stipend *</label>
                     <input
                       type="text"
+                      required
                       value={cStipend}
-                      onChange={(e) => setCStipend(e.target.value)}
+                      onChange={(e) => { setCStipend(e.target.value); setCError(''); }}
                       placeholder="₹25,000 / month"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-cyan-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs sm:text-sm"
                     />
                   </div>
                   <div>
@@ -340,11 +421,11 @@ export default function PortalsHub() {
                     <select
                       value={cDuration}
                       onChange={(e) => setCDuration(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-500"
+                      className="w-full px-3 py-2.5 rounded-xl glass-input text-xs"
                     >
-                      <option value="3 Months">3 Months</option>
-                      <option value="6 Months">6 Months</option>
-                      <option value="Flexible">Flexible</option>
+                      <option value="3 Months" className="bg-slate-900 text-white">3 Months</option>
+                      <option value="6 Months" className="bg-slate-900 text-white">6 Months</option>
+                      <option value="Flexible" className="bg-slate-900 text-white">Flexible</option>
                     </select>
                   </div>
                   <div>
@@ -354,37 +435,39 @@ export default function PortalsHub() {
                       value={cLocation}
                       onChange={(e) => setCLocation(e.target.value)}
                       placeholder="Remote / Bangalore"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-cyan-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs sm:text-sm"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Required Skills (comma separated)</label>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Required Skills * (comma separated)</label>
                   <input
                     type="text"
+                    required
                     value={cSkills}
-                    onChange={(e) => setCSkills(e.target.value)}
+                    onChange={(e) => { setCSkills(e.target.value); setCError(''); }}
                     placeholder="e.g. React, Node.js, PostgreSQL, Tailwind"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-cyan-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs sm:text-sm"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Project Description</label>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Project Description * (min. 10 characters)</label>
                   <textarea
-                    rows="2"
+                    rows="3"
+                    required
                     value={cDesc}
-                    onChange={(e) => setCDesc(e.target.value)}
+                    onChange={(e) => { setCDesc(e.target.value); setCError(''); }}
                     placeholder="Brief description of the project deliverables and scope..."
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-cyan-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs sm:text-sm"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={cSubmitting}
-                  className="w-full py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs shadow-lg shadow-cyan-600/25 flex items-center justify-center gap-2 mt-2 disabled:opacity-60"
+                  className="w-full py-3.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs shadow-lg shadow-cyan-600/25 flex items-center justify-center gap-2 mt-2 disabled:opacity-60 cursor-pointer"
                 >
                   <PlusCircle className="w-4 h-4" />
                   {cSubmitting ? 'Publishing...' : 'Publish Internship & Add to Live Marketplace'}
