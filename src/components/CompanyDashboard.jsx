@@ -15,9 +15,10 @@ import {
   Mail, 
   GraduationCap, 
   Sparkles,
-  Search,
   Filter,
-  Eye
+  Eye,
+  Lock,
+  ShieldCheck
 } from 'lucide-react';
 
 export default function CompanyDashboard() {
@@ -26,9 +27,8 @@ export default function CompanyDashboard() {
   const [myPostings, setMyPostings] = useState([]);
   const [applications, setApplications] = useState([]);
   const [selectedJobFilter, setSelectedJobFilter] = useState('all');
-  const [selectedApplicant, setSelectedApplicant] = useState(null);
 
-  // Form State
+  // Create Form State
   const [cName, setCName] = useState(user?.displayName || '');
   const [cEmail, setCEmail] = useState(user?.email || '');
   const [cTitle, setCTitle] = useState('');
@@ -42,16 +42,19 @@ export default function CompanyDashboard() {
   const [cError, setCError] = useState('');
 
   const loadDashboardData = () => {
-    const allJobs = dbService.getInternships();
-    // Filter to jobs posted by this company/session or show all managed jobs
-    setMyPostings(allJobs);
-
-    try {
-      const allApps = JSON.parse(localStorage.getItem('skillgrad_applications') || '[]');
-      setApplications(allApps);
-    } catch {
+    if (!user) {
+      setMyPostings([]);
       setApplications([]);
+      return;
     }
+
+    // STRICT PRIVACY: Load ONLY postings created by this company/user
+    const isolatedJobs = dbService.getCompanyPostings(user);
+    setMyPostings(isolatedJobs);
+
+    // STRICT PRIVACY: Load ONLY applicants for this company's postings
+    const isolatedApps = dbService.getCompanyApplicants(user);
+    setApplications(isolatedApps);
   };
 
   useEffect(() => {
@@ -64,7 +67,7 @@ export default function CompanyDashboard() {
       window.removeEventListener('skillgrad_internship_posted', handleSync);
       window.removeEventListener('skillgrad_application_submitted', handleSync);
     };
-  }, []);
+  }, [user]);
 
   const handleCreatePosting = async (e) => {
     e.preventDefault();
@@ -88,10 +91,10 @@ export default function CompanyDashboard() {
         location: cLocation.trim(),
         skills: cSkills.split(',').map(s => s.trim()).filter(Boolean),
         description: cDesc.trim()
-      });
+      }, user);
 
       confetti({ particleCount: 80, spread: 70 });
-      addToast('Internship published successfully!', 'success');
+      addToast('Internship published successfully! It is now visible to all students on the marketplace.', 'success');
       setCTitle('');
       setCSkills('');
       setCDesc('');
@@ -117,25 +120,25 @@ export default function CompanyDashboard() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
           <div>
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-xs font-semibold text-cyan-400 mb-3 backdrop-blur-md">
-              <Building2 className="w-3.5 h-3.5" />
-              Hiring Partner Command Center
+              <ShieldCheck className="w-3.5 h-3.5" />
+              Private Employer Workspace • {user?.email || 'Logged In'}
             </div>
             <h1 className="text-3xl sm:text-4xl font-extrabold font-display text-white tracking-tight">
-              Recruitment Status & Postings
+              My Recruitment Dashboard
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 mt-1">
-              Manage your active internship openings, track candidates, and review applications in real time.
+              Private company portal. Only openings and applicants belonging to your account are accessible here.
             </p>
           </div>
 
-          {/* Quick Metrics */}
+          {/* Metrics */}
           <div className="flex items-center gap-3">
             <div className="px-5 py-3 rounded-2xl glass-panel text-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Active Openings</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Your Openings</span>
               <strong className="text-xl font-bold font-display text-cyan-300">{myPostings.length}</strong>
             </div>
             <div className="px-5 py-3 rounded-2xl glass-panel text-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Applicants</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Your Applicants</span>
               <strong className="text-xl font-bold font-display text-emerald-400">{applications.length}</strong>
             </div>
           </div>
@@ -152,7 +155,7 @@ export default function CompanyDashboard() {
             }`}
           >
             <Briefcase className="w-4 h-4" />
-            Active Postings ({myPostings.length})
+            My Published Openings ({myPostings.length})
           </button>
 
           <button
@@ -180,30 +183,32 @@ export default function CompanyDashboard() {
           </button>
         </div>
 
-        {/* Tab 1: Active Postings */}
+        {/* Tab 1: My Published Openings */}
         {activeTab === 'postings' && (
           <div className="space-y-4 animate-fadeIn">
             {myPostings.length === 0 ? (
-              <div className="text-center py-16 glass-panel rounded-3xl">
-                <Briefcase className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                <p className="text-base font-semibold text-slate-300">No active postings yet</p>
-                <p className="text-xs text-slate-500 mt-1">Publish your first internship opportunity to start receiving student applications.</p>
+              <div className="text-center py-16 glass-panel rounded-3xl space-y-3">
+                <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mx-auto text-cyan-400">
+                  <Briefcase className="w-7 h-7" />
+                </div>
+                <h3 className="text-lg font-bold text-white">No Postings Created Yet by Your Account</h3>
+                <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  You have not published any internships under <strong className="text-white">{user?.email}</strong>. Create an internship opening to start receiving student applications.
+                </p>
                 <button
                   onClick={() => setActiveTab('create')}
-                  className="mt-4 px-5 py-2.5 rounded-xl bg-cyan-600 text-white text-xs font-semibold"
+                  className="mt-2 px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold shadow-lg shadow-cyan-600/25 cursor-pointer"
                 >
-                  Post an Internship Now
+                  Post Your First Internship
                 </button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {myPostings.map((job) => (
                   <div key={job.id} className="glass-panel p-6 sm:p-7 rounded-3xl flex flex-col justify-between relative group">
-                    {job.isNew && (
-                      <div className="absolute -top-2.5 right-6 px-3 py-0.5 rounded-full bg-emerald-500 text-slate-950 text-[10px] font-extrabold tracking-wider uppercase shadow-lg flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" /> Published by You
-                      </div>
-                    )}
+                    <div className="absolute -top-2.5 right-6 px-3 py-0.5 rounded-full bg-cyan-500 text-slate-950 text-[10px] font-extrabold tracking-wider uppercase shadow-lg flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" /> Created by You
+                    </div>
 
                     <div>
                       <div className="flex items-start justify-between gap-3 mb-3">
@@ -212,7 +217,7 @@ export default function CompanyDashboard() {
                           <h3 className="text-lg font-bold font-display text-white mt-0.5">{job.title}</h3>
                         </div>
                         <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                          Active Recruitment
+                          Active
                         </span>
                       </div>
 
@@ -271,18 +276,16 @@ export default function CompanyDashboard() {
         {/* Tab 2: Applicant Tracking */}
         {activeTab === 'applicants' && (
           <div className="space-y-6 animate-fadeIn">
-            
-            {/* Filter Bar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl glass-panel">
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-slate-400" />
-                <span className="text-xs font-semibold text-slate-300">Filter by Opening:</span>
+                <span className="text-xs font-semibold text-slate-300">Filter by Your Opening:</span>
                 <select
                   value={selectedJobFilter}
                   onChange={(e) => setSelectedJobFilter(e.target.value)}
                   className="px-3 py-1.5 rounded-xl glass-input text-xs"
                 >
-                  <option value="all" className="bg-slate-900 text-white">All Openings ({applications.length})</option>
+                  <option value="all" className="bg-slate-900 text-white">All Your Openings ({applications.length})</option>
                   {myPostings.map(j => (
                     <option key={j.id} value={j.id} className="bg-slate-900 text-white">{j.title}</option>
                   ))}
@@ -297,8 +300,8 @@ export default function CompanyDashboard() {
             {filteredApplications.length === 0 ? (
               <div className="text-center py-16 glass-panel rounded-3xl">
                 <Users className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                <p className="text-base font-semibold text-slate-300">No applications received yet for this selection</p>
-                <p className="text-xs text-slate-500 mt-1">Student submissions will appear here in real time as they apply on the marketplace.</p>
+                <p className="text-base font-semibold text-slate-300">No applicants received yet for your openings</p>
+                <p className="text-xs text-slate-500 mt-1">When students apply to your published roles, their profiles will appear here.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -308,7 +311,7 @@ export default function CompanyDashboard() {
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <div>
                           <h4 className="text-base font-bold text-white">{app.name}</h4>
-                          <p className="text-xs text-cyan-400 font-semibold">{app.jobTitle || 'General Application'}</p>
+                          <p className="text-xs text-cyan-400 font-semibold">{app.jobTitle || 'Applied Role'}</p>
                         </div>
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
                           {app.status || 'Under Review'}
@@ -320,6 +323,12 @@ export default function CompanyDashboard() {
                           <Mail className="w-3.5 h-3.5 text-slate-400" />
                           <span className="font-mono text-slate-200">{app.email}</span>
                         </div>
+                        {app.phone && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-400 font-bold">Tel:</span>
+                            <span>{app.phone}</span>
+                          </div>
+                        )}
                         {app.college && (
                           <div className="flex items-center gap-2">
                             <GraduationCap className="w-3.5 h-3.5 text-slate-400" />
@@ -346,7 +355,7 @@ export default function CompanyDashboard() {
                     <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-500">
                       <span>Applied: {new Date(app.submittedAt || Date.now()).toLocaleDateString()}</span>
                       <a
-                        href={`mailto:${app.email}?subject=Interview regarding ${encodeURIComponent(app.jobTitle || 'SkillGrad Internship')}`}
+                        href={`mailto:${app.email}?subject=SkillGrad Interview Invitation - ${encodeURIComponent(app.jobTitle || 'Internship')}`}
                         className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs transition-colors flex items-center gap-1"
                       >
                         <Mail className="w-3 h-3" />
@@ -357,7 +366,6 @@ export default function CompanyDashboard() {
                 ))}
               </div>
             )}
-
           </div>
         )}
 
@@ -367,7 +375,7 @@ export default function CompanyDashboard() {
             <div className="mb-6">
               <h3 className="text-2xl font-bold font-display text-white">Post a New Paid Internship</h3>
               <p className="text-xs text-slate-400 mt-1">
-                Your opening will immediately become visible to all students across the platform.
+                Your role will be published to all students across the marketplace under your company account (<strong className="text-white">{user?.email}</strong>).
               </p>
             </div>
 
@@ -486,7 +494,7 @@ export default function CompanyDashboard() {
                   required
                   value={cDesc}
                   onChange={(e) => setCDesc(e.target.value)}
-                  placeholder="Describe key projects, expectations, and mentorship details..."
+                  placeholder="Describe key projects, deliverables, and expectations..."
                   className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs sm:text-sm"
                 />
               </div>

@@ -3,49 +3,8 @@ import { INITIAL_INTERNSHIPS } from '../data/mockData';
 const POSTED_JOBS_KEY = 'skillgrad_posted_internships';
 const APPS_KEY = 'skillgrad_applications';
 
-// Cloud public sync endpoint for universal real-time sharing across all devices & Google accounts
-const CLOUD_SYNC_ENDPOINT = 'https://api.jsonbin.io/v3/b/66d5a11ee41b4d34e42a98f1'; // Shared cloud bin
-
 export const dbService = {
-  // 1. Get all active internships (combining cloud + locally posted + defaults)
-  async fetchLiveInternships() {
-    try {
-      const localCustom = JSON.parse(localStorage.getItem(POSTED_JOBS_KEY) || '[]');
-      
-      // Attempt fetching shared cloud postings
-      let cloudCustom = [];
-      try {
-        const response = await fetch('https://api.web3forms.com/submit', { method: 'OPTIONS' }).catch(() => null);
-      } catch (e) {}
-
-      const allJobsMap = new Map();
-      
-      // Load local custom jobs
-      localCustom.forEach(j => allJobsMap.set(j.id, j));
-      
-      // Load initial featured jobs
-      INITIAL_INTERNSHIPS.forEach(j => {
-        if (!allJobsMap.has(j.id)) allJobsMap.set(j.id, j);
-      });
-
-      // Calculate dynamic applicant counts
-      const applications = JSON.parse(localStorage.getItem(APPS_KEY) || '[]');
-      const appCounts = {};
-      applications.forEach(app => {
-        if (app.jobId) {
-          appCounts[app.jobId] = (appCounts[app.jobId] || 0) + 1;
-        }
-      });
-
-      return Array.from(allJobsMap.values()).map(job => ({
-        ...job,
-        applicantsCount: (job.applicantsCount || 0) + (appCounts[job.id] || 0)
-      }));
-    } catch {
-      return INITIAL_INTERNSHIPS;
-    }
-  },
-
+  // 1. Public Marketplace: returns all jobs for students
   getInternships() {
     try {
       const localCustom = JSON.parse(localStorage.getItem(POSTED_JOBS_KEY) || '[]');
@@ -68,8 +27,41 @@ export const dbService = {
     }
   },
 
-  // 2. Post an Internship (Company) - Saves locally and broadcasts globally
-  async postInternship(jobData) {
+  // 2. Isolated Company View: returns ONLY jobs created by this specific company user
+  getCompanyPostings(user) {
+    if (!user) return [];
+    const allJobs = this.getInternships();
+    const userEmail = (user.email || '').toLowerCase().trim();
+    const userUid = user.uid;
+
+    return allJobs.filter(job => {
+      // Must have been created by this specific user
+      const matchesUid = job.creatorId && job.creatorId === userUid;
+      const matchesCreatorEmail = job.creatorEmail && job.creatorEmail.toLowerCase().trim() === userEmail;
+      const matchesContactEmail = job.contactEmail && job.contactEmail.toLowerCase().trim() === userEmail;
+      return matchesUid || matchesCreatorEmail || matchesContactEmail;
+    });
+  },
+
+  // 3. Isolated Applicants View: returns ONLY applications submitted for this company's jobs
+  getCompanyApplicants(user) {
+    if (!user) return [];
+    const companyJobs = this.getCompanyPostings(user);
+    const companyJobIds = new Set(companyJobs.map(j => j.id));
+
+    try {
+      const allApplications = JSON.parse(localStorage.getItem(APPS_KEY) || '[]');
+      return allApplications.filter(app => companyJobIds.has(app.jobId));
+    } catch {
+      return [];
+    }
+  },
+
+  // 4. Post an Internship (Company) - Attaches creatorId and creatorEmail
+  async postInternship(jobData, currentUser = null) {
+    const creatorId = currentUser?.uid || jobData.creatorId || 'anon-' + Date.now();
+    const creatorEmail = currentUser?.email || jobData.contactEmail || '';
+
     const payload = {
       id: 'sg-posted-' + Date.now(),
       title: jobData.title,
@@ -88,7 +80,9 @@ export const dbService = {
       applicantsCount: 0,
       isNew: true,
       postedAt: new Date().toISOString(),
-      contactEmail: jobData.contactEmail,
+      creatorId: creatorId,
+      creatorEmail: creatorEmail,
+      contactEmail: jobData.contactEmail || creatorEmail,
       status: 'Active'
     };
 
@@ -96,7 +90,7 @@ export const dbService = {
     existing.unshift(payload);
     localStorage.setItem(POSTED_JOBS_KEY, JSON.stringify(existing));
 
-    // Also send an email notification to 2006soutrik@gmail.com about the newly posted role
+    // Notify company recruiter and admin
     try {
       fetch('https://api.web3forms.com/submit', {
         method: 'POST',
@@ -110,19 +104,17 @@ export const dbService = {
           title: payload.title,
           stipend: payload.stipend,
           skills: payload.skills.join(', '),
-          contactEmail: payload.contactEmail,
+          creatorEmail: payload.creatorEmail,
           timestamp: new Date().toLocaleString()
         })
       }).catch(() => {});
     } catch (e) {}
 
-    // Dispatch global event for instant reactive UI updates across all components
     window.dispatchEvent(new CustomEvent('skillgrad_internship_posted', { detail: payload }));
-
     return { success: true, id: payload.id, internship: payload };
   },
 
-  // 3. Submit Student Application
+  // 5. Submit Student Application
   async submitApplication(applicationData) {
     const payload = {
       ...applicationData,
@@ -135,7 +127,6 @@ export const dbService = {
     existing.push(payload);
     localStorage.setItem(APPS_KEY, JSON.stringify(existing));
 
-    // Notify administrator / recruiter at 2006soutrik@gmail.com
     try {
       fetch('https://api.web3forms.com/submit', {
         method: 'POST',
@@ -155,13 +146,11 @@ export const dbService = {
       }).catch(() => {});
     } catch (e) {}
 
-    // Dispatch global application event
     window.dispatchEvent(new CustomEvent('skillgrad_application_submitted', { detail: { jobId: applicationData.jobId } }));
-
     return { success: true, id: payload.id };
   },
 
-  // 4. Contact Us Form Submission (Direct Email to 2006soutrik@gmail.com)
+  // 6. Contact Us Message
   async sendContactMessage(formData) {
     const payload = {
       ...formData,
@@ -170,14 +159,10 @@ export const dbService = {
     };
 
     let emailSent = false;
-
     try {
       const response = await fetch('https://api.web3forms.com/submit', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify({
           access_key: 'b94e3cb2-9386-4f7f-856c-2f9ec6fb4018',
           from_name: formData.name || 'SkillGrad Contact Inquiry',
@@ -193,9 +178,7 @@ export const dbService = {
       });
 
       const resJson = await response.json();
-      if (resJson.success) {
-        emailSent = true;
-      }
+      if (resJson.success) emailSent = true;
     } catch (err) {
       console.warn("Direct email delivery note:", err.message);
     }
