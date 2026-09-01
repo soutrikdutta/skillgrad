@@ -1,124 +1,200 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { authService } from '../firebase/authService';
+import { googleCloudAuth } from '../firebase/googleAuthService';
 
-const AuthContext = createContext();
+const AuthContext = createContext(null);
+const USERS_STORAGE_KEY = 'skillgrad_registered_users';
+const CURRENT_USER_KEY = 'skillgrad_auth_user';
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authModalMode, setAuthModalMode] = useState('login');
+  const [authModalOpen, setAuthModalOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
 
-  useEffect(() => {
-    const unsubscribe = authService.subscribe((currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const addToast = (message, type = 'success', duration = 4000) => {
-    const id = Date.now() + Math.random().toString();
+  // Toast helper
+  const addToast = (message, type = 'info') => {
+    const id = Date.now() + Math.random();
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, duration);
+    }, 4000);
   };
 
   const removeToast = (id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const openAuthModal = (mode = 'login') => {
-    setAuthModalMode(mode);
-    setIsAuthModalOpen(true);
-  };
-
-  const closeAuthModal = () => {
-    setIsAuthModalOpen(false);
-  };
-
-  // Real Google Login
-  const loginWithGoogle = async () => {
+  // Helper to load registered users
+  const getRegisteredUsers = () => {
     try {
-      const res = await authService.loginWithGoogle();
-      if (res.success) {
-        setUser(res.user);
-        closeAuthModal();
-        addToast(`Welcome, ${res.user.displayName || res.user.email}!`, 'success');
-        return { success: true };
-      }
-    } catch (err) {
-      console.error("Google Sign-In error:", err);
-      addToast(err.message || 'Google Sign-In failed', 'error');
-      return { success: false, error: err.message };
+      return JSON.parse(localStorage.getItem(USERS_STORAGE_KEY) || '[]');
+    } catch {
+      return [];
     }
   };
 
-  // Real Email Login
+  // Helper to save registered users
+  const saveRegisteredUsers = (users) => {
+    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+  };
+
+  // Check persisted session on mount
+  useEffect(() => {
+    const current = googleCloudAuth.getCurrentUser();
+    if (current) {
+      setUser(current);
+    }
+    setLoading(false);
+  }, []);
+
+  // 1. Strict User Signup (Registers new account and stores credentials)
+  const signupWithEmail = async (email, password, displayName, role = 'student') => {
+    const cleanEmail = email.trim().toLowerCase();
+    const users = getRegisteredUsers();
+
+    // Check if account already exists
+    const existing = users.find(u => u.email.toLowerCase() === cleanEmail);
+    if (existing) {
+      return { 
+        success: false, 
+        error: 'An account with this email already exists. Please sign in.' 
+      };
+    }
+
+    const newUser = {
+      uid: 'sg-user-' + Date.now(),
+      email: cleanEmail,
+      password: password, // In production this would be hashed on a backend
+      displayName: displayName.trim(),
+      role: role,
+      registeredAt: new Date().toISOString()
+    };
+
+    users.push(newUser);
+    saveRegisteredUsers(users);
+
+    const sessionUser = {
+      uid: newUser.uid,
+      email: newUser.email,
+      displayName: newUser.displayName,
+      role: newUser.role,
+      authProvider: 'email'
+    };
+
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(sessionUser));
+    setUser(sessionUser);
+    addToast(`Welcome to SkillGrad, ${sessionUser.displayName}!`, 'success');
+    return { success: true, user: sessionUser };
+  };
+
+  // 2. Strict User Sign In (Requires existing registered account and matching password)
   const loginWithEmail = async (email, password) => {
-    try {
-      const res = await authService.loginWithEmail(email, password);
-      if (res.success) {
-        setUser(res.user);
-        closeAuthModal();
-        addToast(`Welcome back, ${res.user.displayName || email}!`, 'success');
-        return { success: true };
-      }
-    } catch (err) {
-      addToast(err.message || 'Login failed', 'error');
-      return { success: false, error: err.message };
+    const cleanEmail = email.trim().toLowerCase();
+    const users = getRegisteredUsers();
+
+    const registeredUser = users.find(u => u.email.toLowerCase() === cleanEmail);
+    
+    // Check if user is registered
+    if (!registeredUser) {
+      return { 
+        success: false, 
+        error: 'No account found with this email. Please register first.' 
+      };
     }
+
+    // Check password match
+    if (registeredUser.password !== password) {
+      return { 
+        success: false, 
+        error: 'Incorrect password. Please verify your credentials or reset your password.' 
+      };
+    }
+
+    const sessionUser = {
+      uid: registeredUser.uid,
+      email: registeredUser.email,
+      displayName: registeredUser.displayName,
+      role: registeredUser.role || 'student',
+      authProvider: 'email'
+    };
+
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(sessionUser));
+    setUser(sessionUser);
+    addToast(`Welcome back, ${sessionUser.displayName}!`, 'success');
+    return { success: true, user: sessionUser };
   };
 
-  // Real Email Signup
-  const signupWithEmail = async (email, password, name) => {
-    try {
-      const res = await authService.signupWithEmail(email, password, name);
-      if (res.success) {
-        setUser(res.user);
-        closeAuthModal();
-        addToast(`Account created! Welcome, ${name}!`, 'success');
-        return { success: true };
-      }
-    } catch (err) {
-      addToast(err.message || 'Signup failed', 'error');
-      return { success: false, error: err.message };
+  // 3. Reset / Update Password Flow
+  const resetPassword = async (email, newPassword) => {
+    const cleanEmail = email.trim().toLowerCase();
+    const users = getRegisteredUsers();
+
+    const userIndex = users.findIndex(u => u.email.toLowerCase() === cleanEmail);
+    if (userIndex === -1) {
+      return { 
+        success: false, 
+        error: 'No registered account found with this email address.' 
+      };
     }
+
+    // Update password
+    users[userIndex].password = newPassword;
+    users[userIndex].passwordUpdatedAt = new Date().toISOString();
+    saveRegisteredUsers(users);
+
+    // Send confirmation email via Web3Forms
+    try {
+      fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          access_key: 'b94e3cb2-9386-4f7f-856c-2f9ec6fb4018',
+          from_name: 'SkillGrad Security',
+          subject: 'SkillGrad: Password Reset Confirmation',
+          to_email: cleanEmail,
+          message: `Hello ${users[userIndex].displayName}, your SkillGrad account password was recently reset.`,
+          timestamp: new Date().toLocaleString()
+        })
+      }).catch(() => {});
+    } catch (e) {}
+
+    addToast('Password reset successfully! You can now sign in with your new password.', 'success');
+    return { success: true };
   };
 
+  // 4. Logout
   const logout = async () => {
-    try {
-      await authService.logout();
-      setUser(null);
-      addToast('Signed out successfully.', 'info');
-    } catch (e) {
-      console.error(e);
-    }
+    googleCloudAuth.signOut();
+    localStorage.removeItem(CURRENT_USER_KEY);
+    setUser(null);
+    addToast('You have been signed out.', 'info');
+  };
+
+  const value = {
+    user,
+    loading,
+    loginWithEmail,
+    signupWithEmail,
+    resetPassword,
+    logout,
+    authModalOpen,
+    setAuthModalOpen,
+    toasts,
+    addToast,
+    removeToast
   };
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      loading,
-      isAuthModalOpen,
-      authModalMode,
-      openAuthModal,
-      closeAuthModal,
-      loginWithGoogle,
-      loginWithEmail,
-      signupWithEmail,
-      logout,
-      toasts,
-      addToast,
-      removeToast
-    }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
 }
 
 export function useAuth() {
-  return useContext(AuthContext);
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 }

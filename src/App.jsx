@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import RoleSelectScreen from './components/RoleSelectScreen';
 import LoginPage from './components/LoginPage';
@@ -6,7 +6,8 @@ import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import Features from './components/Features';
 import Opportunities from './components/Opportunities';
-import PortalsHub from './components/PortalsHub';
+import StudentTalentPool from './components/StudentTalentPool';
+import CompanyDashboard from './components/CompanyDashboard';
 import CertificateVerification from './components/CertificateVerification';
 import FAQ from './components/FAQ';
 import ContactUs from './components/ContactUs';
@@ -14,22 +15,36 @@ import Footer from './components/Footer';
 import AuthModal from './components/AuthModal';
 import ToastContainer from './components/Toast';
 
-function MainPlatform({ onRequireAuth }) {
+function StudentPlatform({ onSwitchRole }) {
   return (
     <div className="min-h-screen bg-[#06090F] text-slate-100 selection:bg-indigo-500/30 selection:text-indigo-200">
-      <Navbar />
-      <main>
+      <Navbar currentRole="student" onSwitchRole={onSwitchRole} />
+      <main className="pt-18">
         <Hero />
         <Features />
         <Opportunities />
-        <PortalsHub />
+        <StudentTalentPool />
         <CertificateVerification />
         <FAQ />
         <ContactUs />
       </main>
       <Footer />
-      
-      {/* Modals & Toasts */}
+      <AuthModal />
+      <ToastContainer />
+    </div>
+  );
+}
+
+function CompanyPlatform({ onSwitchRole }) {
+  return (
+    <div className="min-h-screen bg-[#06090F] text-slate-100 selection:bg-indigo-500/30 selection:text-indigo-200">
+      <Navbar currentRole="company" onSwitchRole={onSwitchRole} />
+      <main className="pt-18">
+        <CompanyDashboard />
+        <Opportunities />
+        <ContactUs />
+      </main>
+      <Footer />
       <AuthModal />
       <ToastContainer />
     </div>
@@ -38,8 +53,21 @@ function MainPlatform({ onRequireAuth }) {
 
 function AppContent() {
   const { user, loading } = useAuth();
-  const [selectedRole, setSelectedRole] = useState(null); // null | 'student' | 'company'
+  const [selectedRole, setSelectedRole] = useState(() => {
+    return localStorage.getItem('skillgrad_active_role') || null;
+  });
   const [isGuest, setIsGuest] = useState(false);
+
+  const handleSelectRole = (role) => {
+    setSelectedRole(role);
+    localStorage.setItem('skillgrad_active_role', role);
+  };
+
+  const handleSwitchRole = () => {
+    const nextRole = selectedRole === 'student' ? 'company' : 'student';
+    setSelectedRole(nextRole);
+    localStorage.setItem('skillgrad_active_role', nextRole);
+  };
 
   if (loading) {
     return (
@@ -49,26 +77,32 @@ function AppContent() {
     );
   }
 
-  // 1. If not authenticated and no role selected yet, show Role Selection Screen first
+  // 1. If not authenticated and no role chosen yet, show Role Selection Screen
   if (!user && !isGuest && !selectedRole) {
     return (
       <>
         <RoleSelectScreen 
-          onSelectRole={(role) => setSelectedRole(role)}
-          onContinueAsGuest={() => setIsGuest(true)}
+          onSelectRole={handleSelectRole}
+          onContinueAsGuest={() => {
+            setIsGuest(true);
+            setSelectedRole('student');
+          }}
         />
         <ToastContainer />
       </>
     );
   }
 
-  // 2. Once role is selected, open the tailored Login/Signup view for that role
+  // 2. If not authenticated and role is selected, show tailored Login Page for that role
   if (!user && !isGuest && selectedRole) {
     return (
       <>
         <LoginPage 
           selectedRole={selectedRole}
-          onBackToRoles={() => setSelectedRole(null)}
+          onBackToRoles={() => {
+            setSelectedRole(null);
+            localStorage.removeItem('skillgrad_active_role');
+          }}
           onContinueAsGuest={() => setIsGuest(true)}
         />
         <ToastContainer />
@@ -76,8 +110,12 @@ function AppContent() {
     );
   }
 
-  // 3. Authenticated or Guest Platform
-  return <MainPlatform onRequireAuth={() => setIsGuest(false)} />;
+  // 3. Render Tailored Platform based on role
+  if (selectedRole === 'company') {
+    return <CompanyPlatform onSwitchRole={handleSwitchRole} />;
+  }
+
+  return <StudentPlatform onSwitchRole={handleSwitchRole} />;
 }
 
 export default function App() {
