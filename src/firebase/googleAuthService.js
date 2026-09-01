@@ -14,6 +14,21 @@ export const googleCloudAuth = {
     }
   },
 
+  getCurrentUser() {
+    try {
+      const data = localStorage.getItem(STORAGE_USER_KEY);
+      return data ? JSON.parse(data) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  signOut() {
+    try {
+      localStorage.removeItem(STORAGE_USER_KEY);
+    } catch (e) {}
+  },
+
   signInWithGoogleCloud(customClientId = null) {
     return new Promise((resolve, reject) => {
       const clientId = customClientId || this.getClientId();

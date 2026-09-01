@@ -35,16 +35,26 @@ export function AuthProvider({ children }) {
 
   // Helper to save registered users
   const saveRegisteredUsers = (users) => {
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+    try {
+      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+    } catch (e) {}
   };
 
-  // Check persisted session on mount
+  // Check persisted session on mount safely
   useEffect(() => {
-    const current = googleCloudAuth.getCurrentUser();
-    if (current) {
-      setUser(current);
+    try {
+      const stored = localStorage.getItem(CURRENT_USER_KEY);
+      if (stored) {
+        setUser(JSON.parse(stored));
+      } else if (googleCloudAuth && typeof googleCloudAuth.getCurrentUser === 'function') {
+        const googleUser = googleCloudAuth.getCurrentUser();
+        if (googleUser) setUser(googleUser);
+      }
+    } catch (err) {
+      console.warn('Auth initialization note:', err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   // 1. Strict User Signup (Registers new account and stores credentials)
@@ -64,7 +74,7 @@ export function AuthProvider({ children }) {
     const newUser = {
       uid: 'sg-user-' + Date.now(),
       email: cleanEmail,
-      password: password, // In production this would be hashed on a backend
+      password: password,
       displayName: displayName.trim(),
       role: role,
       registeredAt: new Date().toISOString()
@@ -164,8 +174,13 @@ export function AuthProvider({ children }) {
 
   // 4. Logout
   const logout = async () => {
-    googleCloudAuth.signOut();
+    try {
+      if (googleCloudAuth && typeof googleCloudAuth.signOut === 'function') {
+        googleCloudAuth.signOut();
+      }
+    } catch (e) {}
     localStorage.removeItem(CURRENT_USER_KEY);
+    localStorage.removeItem('skillgrad_active_role');
     setUser(null);
     addToast('You have been signed out.', 'info');
   };
