@@ -10,6 +10,7 @@ import AuthModal from './components/AuthModal';
 import ToastContainer from './components/Toast';
 import FlowBackground from './components/FlowBackground';
 import LoginPage from './components/LoginPage';
+import SkillGradChatbot from './components/SkillGradChatbot';
 
 // Code-splitting for secondary panels
 const CompanyDashboard = React.lazy(() => import('./components/CompanyDashboard'));
@@ -140,17 +141,23 @@ function AppContent() {
             localStorage.setItem('skillgrad_active_role', finalRole);
           }}
         />
+        <SkillGradChatbot />
         <ToastContainer />
       </>
     );
   }
 
   // 2. Render Tailored Platform based on authenticated role
-  if (selectedRole === 'company') {
-    return <CompanyPlatform onSwitchRole={handleSwitchRole} />;
-  }
-
-  return <StudentPlatform onSwitchRole={handleSwitchRole} />;
+  return (
+    <>
+      {selectedRole === 'company' ? (
+        <CompanyPlatform onSwitchRole={handleSwitchRole} />
+      ) : (
+        <StudentPlatform onSwitchRole={handleSwitchRole} />
+      )}
+      <SkillGradChatbot />
+    </>
+  );
 }
 
 export default function App() {
