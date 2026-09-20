@@ -88,21 +88,44 @@ export default function MyApplications() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header */}
-        <div className="mb-8 animate-slide-up">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/25 text-xs font-semibold text-indigo-400 mb-3 backdrop-blur-md">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-            </span>
-            <ClipboardList className="w-3.5 h-3.5 ml-0.5" />
-            Live Application Tracker
+        <div className="mb-8 animate-slide-up flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/25 text-xs font-semibold text-indigo-400 mb-3 backdrop-blur-md">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+              </span>
+              <ClipboardList className="w-3.5 h-3.5 ml-0.5" />
+              Live Application Tracker
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-extrabold font-display tracking-tight">
+              <span className="flow-gradient-text">My Applications</span>
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-300 mt-1">
+              Real-time status updates directly synchronized with hiring partner decisions.
+            </p>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold font-display tracking-tight">
-            <span className="flow-gradient-text">My Applications</span>
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-300 mt-1">
-            Real-time status updates directly synchronized with hiring partner decisions.
-          </p>
+
+          {user && (
+            <div className="inline-flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-900/80 border border-white/[0.08] backdrop-blur-md self-start sm:self-auto">
+              {user.photoURL ? (
+                <img
+                  src={user.photoURL}
+                  alt={user.displayName || 'Google Profile'}
+                  className="w-8 h-8 rounded-full object-cover border border-indigo-500/40 shadow-sm"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold text-white shadow-sm">
+                  {(user.displayName || user.email || 'U')[0].toUpperCase()}
+                </div>
+              )}
+              <div className="text-left">
+                <p className="text-xs font-semibold text-white">{user.displayName || 'Applicant'}</p>
+                <p className="text-[10px] text-slate-400">{user.email}</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Filter Tabs */}

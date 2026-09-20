@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { dbService } from '../firebase/dbService';
 import { useAuth } from '../context/AuthContext';
 import confetti from 'canvas-confetti';
+import CollegeSearchInput from './CollegeSearchInput';
 import { GraduationCap, UserCheck, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
 
 export default function StudentTalentPool() {
@@ -137,14 +138,11 @@ export default function StudentTalentPool() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">College / University *</label>
-                  <input
-                    type="text"
-                    required
+                  <CollegeSearchInput
                     value={sCollege}
-                    onChange={(e) => { setSCollege(e.target.value); setSError(''); }}
-                    placeholder="e.g. Delhi University / VIT"
-                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs sm:text-sm"
+                    onChange={(val) => { setSCollege(val); setSError(''); }}
+                    required
+                    error={sError && !sCollege.trim() ? sError : ''}
                   />
                 </div>
                 <div>

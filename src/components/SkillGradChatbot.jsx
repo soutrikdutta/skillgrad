@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Bot, Sparkles, Send, X, Minimize2, Maximize2, Trash2, 
-  Copy, Check, MessageSquare, ChevronDown, Award, Briefcase, 
+  Copy, Check, GripVertical, ChevronDown, Award, Briefcase, 
   Building2, Clock, ShieldCheck, RefreshCw, AlertCircle
 } from 'lucide-react';
 import { sendChatMessage, SUGGESTED_PROMPTS } from '../services/geminiChatService';
 
 const STORAGE_KEY = 'skillgrad_chat_messages';
+const POS_STORAGE_KEY = 'skillgrad_bot_drag_position';
 
 export default function SkillGradChatbot() {
   const [isOpen, setIsOpen] = useState(false);
@@ -15,7 +16,29 @@ export default function SkillGradChatbot() {
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [showTooltip, setShowTooltip] = useState(true);
-  
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Position state (Draggable anywhere on screen)
+  const [position, setPosition] = useState(() => {
+    try {
+      const saved = localStorage.getItem(POS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+          return {
+            x: Math.max(12, Math.min(window.innerWidth - 72, parsed.x)),
+            y: Math.max(12, Math.min(window.innerHeight - 76, parsed.y))
+          };
+        }
+      }
+    } catch (e) {}
+
+    // Default: Bottom-right corner with 24px margin
+    const defaultX = typeof window !== 'undefined' ? Math.max(16, window.innerWidth - 76) : 320;
+    const defaultY = typeof window !== 'undefined' ? Math.max(16, window.innerHeight - 84) : 560;
+    return { x: defaultX, y: defaultY };
+  });
+
   const [messages, setMessages] = useState(() => {
     try {
       const stored = sessionStorage.getItem(STORAGE_KEY);
@@ -33,6 +56,19 @@ export default function SkillGradChatbot() {
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const dragInfoRef = useRef({ startX: 0, startY: 0, initX: 0, initY: 0, hasMoved: false });
+
+  // Handle window resizing to keep bot in screen
+  useEffect(() => {
+    const handleResize = () => {
+      setPosition(prev => ({
+        x: Math.max(12, Math.min(window.innerWidth - 72, prev.x)),
+        y: Math.max(12, Math.min(window.innerHeight - 76, prev.y))
+      }));
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Persist messages to sessionStorage
   useEffect(() => {
@@ -61,6 +97,108 @@ export default function SkillGradChatbot() {
     return () => clearTimeout(timer);
   }, []);
 
+  // DRAGGING ENGINE FOR FLOATING BOT ICON
+  const handlePointerDown = (e) => {
+    // Only primary button
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    
+    dragInfoRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      initX: position.x,
+      initY: position.y,
+      hasMoved: false
+    };
+
+    const handlePointerMove = (moveEvt) => {
+      const dx = moveEvt.clientX - dragInfoRef.current.startX;
+      const dy = moveEvt.clientY - dragInfoRef.current.startY;
+
+      if (Math.hypot(dx, dy) > 4) {
+        dragInfoRef.current.hasMoved = true;
+        setIsDragging(true);
+      }
+
+      const nextX = Math.max(12, Math.min(window.innerWidth - 72, dragInfoRef.current.initX + dx));
+      const nextY = Math.max(12, Math.min(window.innerHeight - 76, dragInfoRef.current.initY + dy));
+
+      setPosition({ x: nextX, y: nextY });
+    };
+
+    const handlePointerUp = () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+
+      setTimeout(() => setIsDragging(false), 50);
+
+      if (!dragInfoRef.current.hasMoved) {
+        // Was a tap/click -> toggle open
+        setIsOpen(true);
+        setIsMinimized(false);
+        setShowTooltip(false);
+      } else {
+        // Was dragged -> persist coordinate
+        setPosition(finalPos => {
+          try {
+            localStorage.setItem(POS_STORAGE_KEY, JSON.stringify(finalPos));
+          } catch (e) {}
+          return finalPos;
+        });
+      }
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+  };
+
+  // DRAGGING ENGINE FOR CHAT WINDOW HEADER (When open)
+  const handleHeaderPointerDown = (e) => {
+    // Avoid dragging when clicking buttons inside header
+    if (e.target.closest('button')) return;
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+
+    dragInfoRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      initX: position.x,
+      initY: position.y,
+      hasMoved: false
+    };
+
+    const handleHeaderMove = (moveEvt) => {
+      const dx = moveEvt.clientX - dragInfoRef.current.startX;
+      const dy = moveEvt.clientY - dragInfoRef.current.startY;
+
+      if (Math.hypot(dx, dy) > 4) {
+        dragInfoRef.current.hasMoved = true;
+        setIsDragging(true);
+      }
+
+      const nextX = Math.max(12, Math.min(window.innerWidth - 72, dragInfoRef.current.initX + dx));
+      const nextY = Math.max(12, Math.min(window.innerHeight - 76, dragInfoRef.current.initY + dy));
+
+      setPosition({ x: nextX, y: nextY });
+    };
+
+    const handleHeaderUp = () => {
+      window.removeEventListener('pointermove', handleHeaderMove);
+      window.removeEventListener('pointerup', handleHeaderUp);
+      setIsDragging(false);
+
+      if (dragInfoRef.current.hasMoved) {
+        setPosition(finalPos => {
+          try {
+            localStorage.setItem(POS_STORAGE_KEY, JSON.stringify(finalPos));
+          } catch (e) {}
+          return finalPos;
+        });
+      }
+    };
+
+    window.addEventListener('pointermove', handleHeaderMove);
+    window.addEventListener('pointerup', handleHeaderUp);
+  };
+
   const handleSendMessage = async (customText = null) => {
     const text = (customText || inputMessage).trim();
     if (!text || isLoading) return;
@@ -77,7 +215,6 @@ export default function SkillGradChatbot() {
     setIsLoading(true);
 
     try {
-      // Build history for model
       const history = messages
         .filter(m => m.id !== 'initial-greeting')
         .map(m => ({ role: m.role, content: m.content }));
@@ -99,7 +236,7 @@ export default function SkillGradChatbot() {
         {
           id: 'err-' + Date.now(),
           role: 'model',
-          content: "I ran into a temporary hiccup communicating with Gemini. Please try asking again in a moment!",
+          content: "I ran into a temporary issue communicating with Gemini. Please try asking again in a moment!",
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
@@ -134,35 +271,18 @@ export default function SkillGradChatbot() {
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  // Simple markdown renderer for bold, lists, and headers
   const renderFormattedContent = (content) => {
     const lines = content.split('\n');
     return lines.map((line, idx) => {
-      // Headers ###
       if (line.startsWith('### ')) {
-        return (
-          <h4 key={idx} className="text-sm font-bold text-white mt-2 mb-1">
-            {line.replace('### ', '')}
-          </h4>
-        );
+        return <h4 key={idx} className="text-sm font-bold text-white mt-2 mb-1">{line.replace('### ', '')}</h4>;
       }
       if (line.startsWith('## ')) {
-        return (
-          <h3 key={idx} className="text-base font-bold text-white mt-2.5 mb-1">
-            {line.replace('## ', '')}
-          </h3>
-        );
+        return <h3 key={idx} className="text-base font-bold text-white mt-2.5 mb-1">{line.replace('## ', '')}</h3>;
       }
-      // Bullet points
       if (line.startsWith('- ') || line.startsWith('* ')) {
-        const text = line.substring(2);
-        return (
-          <li key={idx} className="ml-4 list-disc text-slate-200 my-0.5 leading-relaxed">
-            {renderInlineMarkdown(text)}
-          </li>
-        );
+        return <li key={idx} className="ml-4 list-disc text-slate-200 my-0.5 leading-relaxed">{renderInlineMarkdown(line.substring(2))}</li>;
       }
-      // Numbered lists e.g. "1. "
       const numMatch = line.match(/^(\d+)\.\s(.*)/);
       if (numMatch) {
         return (
@@ -172,20 +292,11 @@ export default function SkillGradChatbot() {
           </div>
         );
       }
-      // Empty line
-      if (!line.trim()) {
-        return <div key={idx} className="h-1.5" />;
-      }
-      // Regular paragraph
-      return (
-        <p key={idx} className="my-0.5 leading-relaxed">
-          {renderInlineMarkdown(line)}
-        </p>
-      );
+      if (!line.trim()) return <div key={idx} className="h-1.5" />;
+      return <p key={idx} className="my-0.5 leading-relaxed">{renderInlineMarkdown(line)}</p>;
     });
   };
 
-  // Inline formatting for **bold** and `code`
   const renderInlineMarkdown = (text) => {
     const parts = text.split(/(\*\*.*?\*\*|`.*?`)/g);
     return parts.map((part, i) => {
@@ -203,60 +314,103 @@ export default function SkillGradChatbot() {
     });
   };
 
+  // Calculate window placement dynamically based on draggable position
+  const winWidth = typeof window !== 'undefined' ? Math.min(420, window.innerWidth * 0.94) : 420;
+  const winHeight = isMinimized ? 56 : 580;
+  
+  // Keep window inside visible bounds
+  let computedWinX = position.x - winWidth + 60;
+  let computedWinY = position.y - winHeight + 60;
+
+  if (typeof window !== 'undefined') {
+    if (computedWinX < 12) computedWinX = Math.max(12, position.x);
+    if (computedWinX + winWidth > window.innerWidth - 12) {
+      computedWinX = window.innerWidth - winWidth - 12;
+    }
+    if (computedWinY < 12) computedWinY = Math.max(12, position.y + 68);
+    if (computedWinY + winHeight > window.innerHeight - 12) {
+      computedWinY = window.innerHeight - winHeight - 12;
+    }
+  }
+
   return (
-    <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 select-none">
-      
-      {/* 1. FLOATING CHAT BUTTON (WHEN CLOSED) */}
+    <>
+      {/* 1. FLOATING CHAT BUTTON (WHEN CLOSED) — DRAGGABLE ANYWHERE */}
       {!isOpen && (
-        <div className="relative group">
-          {/* Tooltip Pill */}
-          {showTooltip && (
-            <div className="absolute -top-12 right-0 bg-slate-900/95 text-white border border-indigo-500/30 shadow-xl px-3.5 py-1.5 rounded-full text-xs font-medium flex items-center gap-2 whitespace-nowrap animate-bounce-in">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              <span>Ask SkillGrad AI</span>
-              <button 
-                onClick={(e) => { e.stopPropagation(); setShowTooltip(false); }}
-                className="text-slate-400 hover:text-white ml-0.5"
-              >
-                ×
-              </button>
-            </div>
-          )}
+        <div 
+          style={{
+            position: 'fixed',
+            left: `${position.x}px`,
+            top: `${position.y}px`,
+            zIndex: 9999,
+            touchAction: 'none'
+          }}
+          className="select-none"
+        >
+          <div className="relative group">
+            {/* Tooltip Pill */}
+            {showTooltip && (
+              <div className="absolute -top-12 right-0 bg-slate-900/95 text-white border border-indigo-500/30 shadow-xl px-3.5 py-1.5 rounded-full text-xs font-medium flex items-center gap-2 whitespace-nowrap animate-bounce-in pointer-events-none">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                <span>Drag me anywhere or Click to Ask AI</span>
+              </div>
+            )}
 
-          {/* Glowing Aura */}
-          <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-500 rounded-full blur-md opacity-70 group-hover:opacity-100 transition-all duration-300 animate-glow-pulse pointer-events-none" />
+            {/* Glowing Aura */}
+            <div className={`absolute -inset-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-500 rounded-full blur-md transition-all duration-300 pointer-events-none ${
+              isDragging ? 'opacity-100 scale-110' : 'opacity-70 group-hover:opacity-100 animate-glow-pulse'
+            }`} />
 
-          {/* Trigger Button */}
-          <button
-            type="button"
-            onClick={() => { setIsOpen(true); setIsMinimized(false); setShowTooltip(false); }}
-            className="relative w-14 h-14 rounded-full bg-[#0c101b] border border-indigo-500/50 hover:border-indigo-400 text-white flex items-center justify-center shadow-2xl shadow-indigo-950/80 transition-all duration-200 active:scale-95 cursor-pointer hover:scale-105"
-            aria-label="Open SkillGrad AI Chatbot"
-          >
-            <div className="relative">
-              <Bot className="w-7 h-7 text-indigo-300 group-hover:text-white transition-colors" />
-              <Sparkles className="w-3.5 h-3.5 text-cyan-400 absolute -top-1.5 -right-1.5 animate-pulse" />
+            {/* Draggable Trigger Button */}
+            <div
+              onPointerDown={handlePointerDown}
+              className={`relative w-14 h-14 rounded-full bg-[#0c101b] border border-indigo-500/50 hover:border-indigo-400 text-white flex items-center justify-center shadow-2xl shadow-indigo-950/80 transition-transform select-none ${
+                isDragging ? 'cursor-grabbing scale-110' : 'cursor-grab hover:scale-105 active:scale-95'
+              }`}
+              title="Drag and place anywhere, or click to chat with GradBot"
+              role="button"
+              aria-label="SkillGrad AI Assistant (Draggable)"
+            >
+              {/* Subtle drag grip handle */}
+              <div className="absolute left-1 top-1/2 -translate-y-1/2 opacity-30 group-hover:opacity-70 transition-opacity">
+                <GripVertical className="w-2.5 h-2.5 text-slate-400" />
+              </div>
+
+              <div className="relative">
+                <Bot className="w-7 h-7 text-indigo-300 group-hover:text-white transition-colors" />
+                <Sparkles className="w-3.5 h-3.5 text-cyan-400 absolute -top-1.5 -right-1.5 animate-pulse" />
+              </div>
             </div>
-          </button>
+          </div>
         </div>
       )}
 
-      {/* 2. CHAT WINDOW (WHEN OPEN) */}
+      {/* 2. CHAT WINDOW (WHEN OPEN) — DRAGGABLE HEADER */}
       {isOpen && (
         <div 
-          className={`relative bg-[#0c101c]/95 border border-indigo-500/30 rounded-2xl shadow-2xl shadow-indigo-950/80 backdrop-blur-xl transition-all duration-300 overflow-hidden flex flex-col ${
-            isMinimized 
-              ? 'w-72 h-14 sm:w-80' 
-              : 'w-[92vw] sm:w-[420px] h-[580px] max-h-[82vh]'
-          }`}
-          style={{ transform: 'translate3d(0, 0, 0)', backfaceVisibility: 'hidden' }}
+          style={{
+            position: 'fixed',
+            left: `${computedWinX}px`,
+            top: `${computedWinY}px`,
+            width: `${winWidth}px`,
+            height: `${winHeight}px`,
+            zIndex: 9999,
+            transform: 'translate3d(0, 0, 0)',
+            backfaceVisibility: 'hidden'
+          }}
+          className="bg-[#0c101c]/98 border border-indigo-500/35 rounded-2xl shadow-2xl shadow-black/80 backdrop-blur-2xl transition-all duration-200 overflow-hidden flex flex-col select-none"
         >
           {/* Header Ambient Glow */}
           <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-indigo-500 via-cyan-400 to-purple-500" />
 
-          {/* HEADER */}
-          <div className="px-4 py-3 bg-slate-900/90 border-b border-white/[0.08] flex items-center justify-between shrink-0">
+          {/* DRAGGABLE HEADER */}
+          <div 
+            onPointerDown={handleHeaderPointerDown}
+            className="px-4 py-3 bg-slate-900/90 border-b border-white/[0.08] flex items-center justify-between shrink-0 cursor-grab active:cursor-grabbing select-none"
+            title="Drag header to move chat window"
+          >
             <div className="flex items-center gap-2.5">
+              <GripVertical className="w-3.5 h-3.5 text-slate-500" />
               <div className="relative">
                 <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/30">
                   <Bot className="w-4 h-4" />
@@ -271,7 +425,7 @@ export default function SkillGradChatbot() {
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
-                  <span>SkillGrad Platform AI</span>
+                  <span>Drag header to position</span>
                 </p>
               </div>
             </div>
@@ -307,7 +461,7 @@ export default function SkillGradChatbot() {
             </div>
           </div>
 
-          {/* EXPANDED CONTENT (Only shown when not minimized) */}
+          {/* EXPANDED CONTENT */}
           {!isMinimized && (
             <>
               {/* MESSAGES SCROLL AREA */}
@@ -351,7 +505,7 @@ export default function SkillGradChatbot() {
                   );
                 })}
 
-                {/* Thinking / Loading indicator */}
+                {/* Thinking Indicator */}
                 {isLoading && (
                   <div className="flex gap-2.5 items-start justify-start animate-fadeIn">
                     <div className="w-6 h-6 rounded-lg bg-indigo-600/30 border border-indigo-500/30 flex items-center justify-center shrink-0 text-indigo-300">
@@ -430,7 +584,6 @@ export default function SkillGradChatbot() {
 
         </div>
       )}
-
-    </div>
+    </>
   );
 }

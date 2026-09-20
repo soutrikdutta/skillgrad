@@ -3,6 +3,7 @@ import { DOMAINS_LIST } from '../data/mockData';
 import { dbService } from '../firebase/dbService';
 import { useAuth } from '../context/AuthContext';
 import confetti from 'canvas-confetti';
+import CollegeSearchInput from './CollegeSearchInput';
 import { 
   Search, 
   MapPin, 
@@ -382,6 +383,33 @@ export default function Opportunities() {
                   </p>
                 </div>
 
+                {/* Candidate Verified Account Card */}
+                {user && (
+                  <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-900/80 border border-white/[0.08] mb-3">
+                    {user.photoURL ? (
+                      <img 
+                        src={user.photoURL} 
+                        alt={user.displayName || 'Google Profile'} 
+                        className="w-8 h-8 rounded-full object-cover border border-indigo-500/40 shadow-sm"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xs font-bold text-white shadow-sm">
+                        {(user.displayName || user.email || 'U')[0].toUpperCase()}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-white truncate">{user.displayName || 'Candidate'}</span>
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          {user.authProvider === 'google.com' || user.photoURL ? 'Google Verified' : 'Verified'}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-slate-400 truncate block">{user.email}</span>
+                    </div>
+                  </div>
+                )}
+
                 {modalError && (
                   <div className="mb-4 p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
@@ -427,14 +455,11 @@ export default function Opportunities() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">College / University *</label>
-                      <input
-                        type="text"
-                        required
+                      <CollegeSearchInput
                         value={applicantCollege}
-                        onChange={(e) => { setApplicantCollege(e.target.value); setModalError(''); }}
-                        placeholder="e.g. IIT Bombay / VIT / DU"
-                        className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs sm:text-sm"
+                        onChange={(val) => { setApplicantCollege(val); setModalError(''); }}
+                        required
+                        error={modalError && !applicantCollege.trim() ? modalError : ''}
                       />
                     </div>
                   </div>

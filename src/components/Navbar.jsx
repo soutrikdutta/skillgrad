@@ -122,24 +122,54 @@ export default function Navbar({ currentRole = 'student', onSwitchRole }) {
             <div className="relative">
               <button 
                 onClick={(e) => { e.stopPropagation(); setProfileOpen(!profileOpen); }}
-                className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-white/[0.06] transition-all duration-200 cursor-pointer"
+                className="flex items-center gap-2 px-1.5 py-1 rounded-full hover:bg-white/[0.06] transition-all duration-200 cursor-pointer"
               >
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm transition-all duration-300 ${
-                  isCompany 
-                    ? 'bg-gradient-to-br from-cyan-500 to-blue-600' 
-                    : 'bg-gradient-to-br from-indigo-500 to-purple-600'
-                }`}>
-                  {user.displayName ? user.displayName.charAt(0).toUpperCase() : user.email?.charAt(0).toUpperCase()}
-                </div>
+                {user.photoURL ? (
+                  <img 
+                    src={user.photoURL} 
+                    alt={user.displayName || 'Google Profile'} 
+                    className="w-8 h-8 rounded-full object-cover border border-indigo-500/50 shadow-sm"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm transition-all duration-300 ${
+                    isCompany 
+                      ? 'bg-gradient-to-br from-cyan-500 to-blue-600' 
+                      : 'bg-gradient-to-br from-indigo-500 to-purple-600'
+                  }`}>
+                    {user.displayName ? user.displayName.charAt(0).toUpperCase() : user.email?.charAt(0).toUpperCase()}
+                  </div>
+                )}
                 <ChevronRight className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${profileOpen ? 'rotate-90' : ''}`} />
               </button>
 
               {/* Dropdown */}
               {profileOpen && (
-                <div className="absolute right-0 top-full mt-2 w-56 glass-panel rounded-xl p-2 shadow-2xl border border-white/[0.08] animate-scale-in z-50" style={{ transformOrigin: 'top right' }}>
-                  <div className="px-3 py-2 border-b border-white/[0.06] mb-1">
-                    <p className="text-xs font-bold text-white truncate">{user.displayName || 'User'}</p>
-                    <p className="text-[11px] text-slate-400 truncate">{user.email}</p>
+                <div className="absolute right-0 top-full mt-2 w-64 glass-panel rounded-xl p-2.5 shadow-2xl border border-white/[0.08] animate-scale-in z-50" style={{ transformOrigin: 'top right' }}>
+                  <div className="flex items-center gap-3 px-2 py-2 border-b border-white/[0.06] mb-1.5">
+                    {user.photoURL ? (
+                      <img 
+                        src={user.photoURL} 
+                        alt={user.displayName || 'Google Profile'} 
+                        className="w-10 h-10 rounded-full object-cover border-2 border-indigo-500/40 shadow-sm shrink-0"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-sm shrink-0 ${
+                        isCompany ? 'bg-gradient-to-br from-cyan-500 to-blue-600' : 'bg-gradient-to-br from-indigo-500 to-purple-600'
+                      }`}>
+                        {user.displayName ? user.displayName.charAt(0).toUpperCase() : user.email?.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-white truncate">{user.displayName || 'User'}</p>
+                      <p className="text-[11px] text-slate-400 truncate">{user.email}</p>
+                      {user.photoURL && (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-medium mt-0.5">
+                          ✓ Google Account
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <button
                     onClick={() => { setProfileOpen(false); logout(); }}
@@ -200,13 +230,25 @@ export default function Navbar({ currentRole = 'student', onSwitchRole }) {
           {/* User info + logout */}
           {user && (
             <div className="pt-3 mt-2 border-t border-white/[0.06] flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white ${
-                  isCompany ? 'bg-gradient-to-br from-cyan-500 to-blue-600' : 'bg-gradient-to-br from-indigo-500 to-purple-600'
-                }`}>
-                  {user.displayName ? user.displayName.charAt(0).toUpperCase() : user.email?.charAt(0).toUpperCase()}
+              <div className="flex items-center gap-2.5">
+                {user.photoURL ? (
+                  <img 
+                    src={user.photoURL} 
+                    alt={user.displayName || 'Google Profile'} 
+                    className="w-8 h-8 rounded-full object-cover border border-indigo-500/50 shadow-sm"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white ${
+                    isCompany ? 'bg-gradient-to-br from-cyan-500 to-blue-600' : 'bg-gradient-to-br from-indigo-500 to-purple-600'
+                  }`}>
+                    {user.displayName ? user.displayName.charAt(0).toUpperCase() : user.email?.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="text-[12px] font-semibold text-white truncate max-w-[150px]">{user.displayName || 'User'}</p>
+                  <p className="text-[10px] text-slate-400 truncate max-w-[150px]">{user.email}</p>
                 </div>
-                <span className="text-[12px] text-slate-400 truncate max-w-[160px]">{user.email}</span>
               </div>
               <button onClick={() => { logout(); setMobileMenuOpen(false); }} className="text-[12px] text-rose-400 font-semibold hover:text-rose-300 cursor-pointer">
                 Sign Out
