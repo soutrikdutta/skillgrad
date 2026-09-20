@@ -82,6 +82,8 @@ export default function Navbar({ currentRole = 'student', onSwitchRole }) {
             {isCompany ? <Building2 className="w-3 h-3" /> : <GraduationCap className="w-3 h-3" />}
             <span>{isCompany ? 'Employer' : 'Student'}</span>
           </div>
+
+          <span className="hidden lg:inline-block text-[10px] text-slate-500 font-mono">made by :- soutrik_2006</span>
         </div>
 
         {/* Center: Desktop Nav Links */}
@@ -211,6 +213,11 @@ export default function Navbar({ currentRole = 'student', onSwitchRole }) {
               </button>
             </div>
           )}
+
+          {/* Attribution Credit */}
+          <div className="pt-3 text-center text-[10px] text-slate-500 font-mono">
+            made by :- soutrik_2006
+          </div>
         </div>
       </div>
     </header>

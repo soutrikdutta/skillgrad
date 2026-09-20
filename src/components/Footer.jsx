@@ -69,8 +69,10 @@ export default function Footer() {
 
         {/* Bottom Bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <div>
-            © {new Date().getFullYear()} SkillGrad. All rights reserved. Bridging Skills and Industry.
+          <div className="flex flex-col sm:flex-row items-center gap-2">
+            <span>© {new Date().getFullYear()} SkillGrad. All rights reserved. Bridging Skills and Industry.</span>
+            <span className="hidden sm:inline text-slate-700">•</span>
+            <span className="text-[11px] text-slate-400 font-mono">made by :- soutrik_2006</span>
           </div>
 
           <div className="flex items-center gap-4">

@@ -26,6 +26,8 @@ export default function Hero() {
           <span>Bridging Skills & Industry</span>
           <span className="text-slate-600">•</span>
           <span className="text-emerald-400 font-medium">100% Paid Stipends</span>
+          <span className="hidden sm:inline text-slate-600">•</span>
+          <span className="hidden sm:inline text-[11px] text-slate-400 font-mono">made by :- soutrik_2006</span>
         </div>
 
         {/* Headline with Continuous Flowing Gradient */}

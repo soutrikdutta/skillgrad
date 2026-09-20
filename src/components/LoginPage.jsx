@@ -368,9 +368,12 @@ export default function LoginPage({ onLoginSuccess }) {
         </div>
 
         {/* Security Footer */}
-        <div className="mt-4 text-center text-[12px] sm:text-[11px] text-slate-500 flex items-center justify-center gap-1.5 animate-fadeIn" style={{ animationDelay: '0.5s' }}>
-          <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
-          <span>Encrypted credential storage</span>
+        <div className="mt-4 text-center text-[12px] sm:text-[11px] text-slate-500 flex flex-col items-center justify-center gap-1.5 animate-fadeIn" style={{ animationDelay: '0.5s' }}>
+          <div className="flex items-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
+            <span>Encrypted credential storage</span>
+          </div>
+          <span className="text-[10px] text-slate-400 font-mono tracking-wide">made by :- soutrik_2006</span>
         </div>
 
       </div>

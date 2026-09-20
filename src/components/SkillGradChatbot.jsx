@@ -420,8 +420,9 @@ export default function SkillGradChatbot() {
                 </form>
 
                 <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-500 px-1">
-                  <span>Powered by Gemini 3.6 Flash</span>
-                  <span>Enter ↵ to send</span>
+                  <span>Powered by Gemini 3.6</span>
+                  <span className="text-[9px] text-slate-400 font-mono">made by :- soutrik_2006</span>
+                  <span>Enter ↵</span>
                 </div>
               </div>
             </>
