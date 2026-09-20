@@ -1,10 +1,7 @@
 import React from 'react';
-import { useAuth } from '../context/AuthContext';
-import { ArrowRight, Sparkles, CheckCircle2, ShieldCheck, Briefcase, Award } from 'lucide-react';
+import { ArrowRight, Sparkles, CheckCircle2, ShieldCheck, Award } from 'lucide-react';
 
 export default function Hero() {
-  const { openAuthModal } = useAuth();
-
   const scrollTo = (id) => {
     const el = document.getElementById(id);
     if (el) {
@@ -16,67 +13,68 @@ export default function Hero() {
   };
 
   return (
-    <section className="relative pt-32 pb-16 md:pt-40 md:pb-24 overflow-hidden">
-      {/* Ambient background glow */}
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[300px] bg-gradient-to-tr from-primary-600/25 via-indigo-600/20 to-cyan-500/20 blur-[130px] rounded-full pointer-events-none" />
-      <div className="absolute inset-0 bg-grid-pattern opacity-30 pointer-events-none" />
-
+    <section className="relative pt-24 pb-14 sm:pt-32 sm:pb-20 md:pt-36 md:pb-24 overflow-hidden">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
         
-        {/* Pill Badge */}
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/80 border border-primary-500/30 text-xs font-semibold text-slate-200 mb-6 backdrop-blur-md">
-          <Sparkles className="w-3.5 h-3.5 text-primary-400" />
+        {/* Animated Badge with Pulsing Beacon */}
+        <div className="animate-bounce-in inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-slate-900/85 border border-indigo-500/25 text-[13px] sm:text-xs font-semibold text-slate-200 mb-6 shadow-lg shadow-indigo-500/10">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+          </span>
+          <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
           <span>Bridging Skills & Industry</span>
-          <span className="text-slate-500">•</span>
-          <span className="text-emerald-400 font-medium">100% Paid Projects</span>
+          <span className="text-slate-600">•</span>
+          <span className="text-emerald-400 font-medium">100% Paid Stipends</span>
         </div>
 
-        {/* Crisp Headline */}
-        <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold font-display tracking-tight text-white leading-[1.1]">
+        {/* Headline with Continuous Flowing Gradient */}
+        <h1 className="animate-scale-in text-3xl sm:text-5xl md:text-7xl font-black font-display tracking-tight text-white leading-[1.08]">
           Turn Your Skills Into{' '}
-          <span className="gradient-text">Paid Experience</span>
+          <span className="flow-gradient-text block sm:inline mt-1 sm:mt-0">
+            Paid Experience
+          </span>
         </h1>
 
-        {/* Short Subtitle */}
-        <p className="mt-5 text-base sm:text-lg text-slate-300 max-w-xl mx-auto font-normal leading-relaxed">
-          Connect with real industry projects, earn verified credentials, and launch your career with top tech companies.
+        {/* Animated Flow Light Beam Under Headline */}
+        <div className="w-32 sm:w-48 h-[2px] mx-auto my-5 flow-beam-h" />
+
+        {/* Subtitle */}
+        <p className="text-[15px] sm:text-base md:text-lg text-slate-300 max-w-xl mx-auto font-normal leading-relaxed animate-slide-up" style={{ animationDelay: '0.15s' }}>
+          Connect with active industry projects, earn tamper-proof verified credentials, and accelerate your tech career.
         </p>
 
-        {/* Action CTAs */}
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+        {/* CTAs */}
+        <div className="mt-7 sm:mt-9 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 animate-slide-up" style={{ animationDelay: '0.25s' }}>
           <button
             onClick={() => scrollTo('opportunities')}
-            className="px-8 py-3.5 rounded-xl bg-gradient-to-r from-primary-600 to-indigo-600 hover:from-primary-500 hover:to-indigo-500 text-white font-semibold text-sm shadow-xl shadow-indigo-600/25 transition-all duration-200 hover:scale-[1.02] flex items-center gap-2"
+            className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-blue-500 hover:from-indigo-600 hover:to-blue-600 text-white font-bold text-sm shadow-xl shadow-indigo-500/25 transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.97] group"
           >
-            Explore Internships
-            <ArrowRight className="w-4 h-4" />
+            <span>Explore Internships</span>
+            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
           </button>
 
           <button
-            onClick={() => scrollTo('portals')}
-            className="px-7 py-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-200 hover:text-white font-semibold text-sm transition-all"
+            onClick={() => scrollTo('my-applications')}
+            className="w-full sm:w-auto px-7 py-3.5 rounded-xl glass-panel-interactive border border-white/[0.1] hover:border-indigo-500/40 text-slate-200 hover:text-white font-semibold text-sm transition-all duration-300 cursor-pointer active:scale-[0.97]"
           >
-            Post a Project / Hire
+            Track My Applications
           </button>
         </div>
 
-        {/* Stats Row */}
-        <div className="mt-14 pt-8 border-t border-slate-800/80 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
-          <div>
-            <div className="text-2xl sm:text-3xl font-extrabold font-display text-white">1,200+</div>
-            <div className="text-xs text-slate-400 mt-0.5">Internships Funded</div>
+        {/* Value Props */}
+        <div className="mt-10 sm:mt-14 pt-6 sm:pt-8 border-t border-white/[0.06] stagger-children flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-12 text-[13px] sm:text-xs text-slate-400">
+          <div className="flex items-center gap-2 hover:text-white transition-colors duration-200">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>Guaranteed Stipends</span>
           </div>
-          <div>
-            <div className="text-2xl sm:text-3xl font-extrabold font-display text-primary-400">3,500+</div>
-            <div className="text-xs text-slate-400 mt-0.5">Active Students</div>
+          <div className="flex items-center gap-2 hover:text-white transition-colors duration-200">
+            <ShieldCheck className="w-4 h-4 text-indigo-400" />
+            <span>Verified Credentials</span>
           </div>
-          <div>
-            <div className="text-2xl sm:text-3xl font-extrabold font-display text-cyan-400">150+</div>
-            <div className="text-xs text-slate-400 mt-0.5">Partner Startups</div>
-          </div>
-          <div>
-            <div className="text-2xl sm:text-3xl font-extrabold font-display text-emerald-400">100%</div>
-            <div className="text-xs text-slate-400 mt-0.5">Verified Stipends</div>
+          <div className="flex items-center gap-2 hover:text-white transition-colors duration-200">
+            <Award className="w-4 h-4 text-amber-400" />
+            <span>Direct PPO Pathways</span>
           </div>
         </div>
 

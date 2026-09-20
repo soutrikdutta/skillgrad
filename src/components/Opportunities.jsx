@@ -39,6 +39,12 @@ export default function Opportunities() {
   useEffect(() => {
     setInternships(dbService.getInternships());
 
+    dbService.fetchLiveInternships().then((jobs) => {
+      if (jobs && Array.isArray(jobs)) {
+        setInternships(jobs);
+      }
+    });
+
     const handleNewInternship = (e) => {
       if (e.detail) {
         setInternships((prev) => [e.detail, ...prev.filter(item => item.id !== e.detail.id)]);
@@ -161,16 +167,20 @@ export default function Opportunities() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Section Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6 animate-slide-up">
           <div>
-            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-primary-500/10 border border-primary-500/30 text-xs font-semibold text-primary-400 mb-3 backdrop-blur-md">
-              <Briefcase className="w-3.5 h-3.5" />
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-xs font-semibold text-indigo-300 mb-3 backdrop-blur-md">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+              </span>
+              <Briefcase className="w-3.5 h-3.5 ml-0.5" />
               Live Internship Marketplace
             </div>
-            <h2 className="text-3xl sm:text-4xl font-extrabold font-display text-white tracking-tight">
-              Featured Paid Opportunities
+            <h2 className="text-3xl sm:text-4xl font-extrabold font-display tracking-tight">
+              <span className="flow-gradient-text">Featured Paid Opportunities</span>
             </h2>
-            <p className="text-xs sm:text-sm text-slate-400 mt-2 max-w-xl">
+            <p className="text-xs sm:text-sm text-slate-300 mt-2 max-w-xl">
               Active projects from verified startups and hiring companies. Apply in 60 seconds.
             </p>
           </div>
@@ -189,12 +199,12 @@ export default function Opportunities() {
         </div>
 
         {/* Domain Filter Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-8 scrollbar-none">
+        <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-8 scrollbar-none stagger-children">
           {DOMAINS_LIST.map((domain) => (
             <button
               key={domain}
               onClick={() => setSelectedDomain(domain)}
-              className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
+              className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer ${
                 selectedDomain === domain
                   ? 'bg-primary-600 text-white shadow-lg shadow-indigo-600/30'
                   : 'bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-800/80 border border-white/10'
@@ -207,19 +217,25 @@ export default function Opportunities() {
 
         {/* Opportunities Grid */}
         {filteredList.length === 0 ? (
-          <div className="text-center py-16 glass-panel rounded-3xl">
-            <Briefcase className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-            <p className="text-base font-semibold text-slate-300">No internships match your current search</p>
-            <p className="text-xs text-slate-500 mt-1">Try resetting your filters or post a new role under "Get Started".</p>
-            <button
-              onClick={() => { setSelectedDomain('All Domains'); setSearchQuery(''); }}
-              className="mt-4 px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-primary-400 hover:bg-slate-700"
-            >
-              Reset Filters
-            </button>
+          <div className="text-center py-16 glass-panel rounded-3xl space-y-3 animate-scale-in">
+            <div className="w-14 h-14 rounded-2xl bg-primary-500/10 border border-primary-500/30 flex items-center justify-center mx-auto text-primary-400">
+              <Briefcase className="w-7 h-7" />
+            </div>
+            <h3 className="text-lg font-bold text-white">No Active Internships Listed</h3>
+            <p className="text-xs text-slate-400 max-w-md mx-auto">
+              There are currently no internship postings matching your filters in the database. New roles posted by partner companies will appear here instantly.
+            </p>
+            {searchQuery && (
+              <button
+                onClick={() => { setSelectedDomain('All Domains'); setSearchQuery(''); }}
+                className="mt-2 px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-primary-400 hover:bg-slate-700 cursor-pointer"
+              >
+                Reset Search Filters
+              </button>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 stagger-children">
             {filteredList.map((job) => (
               <div
                 key={job.id}
@@ -319,7 +335,7 @@ export default function Opportunities() {
       {activeModalJob && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
           <div 
-            className="relative w-full max-w-xl glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl max-h-[90vh] overflow-y-auto"
+            className="relative w-full max-w-xl glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl max-h-[90vh] overflow-y-auto animate-scale-in"
             onClick={(e) => e.stopPropagation()}
           >
             <button

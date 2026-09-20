@@ -1,45 +1,54 @@
 import React, { useState } from 'react';
 import { MOCK_CERTIFICATES } from '../data/mockData';
+import { dbService } from '../firebase/dbService';
 import { useAuth } from '../context/AuthContext';
 import { Award, Search, ShieldCheck, CheckCircle, ExternalLink, Printer, X } from 'lucide-react';
 
 export default function CertificateVerification() {
   const { addToast } = useAuth();
-  const [certId, setCertId] = useState('SG-2024-8842');
+  const [certId, setCertId] = useState('');
   const [verifiedCert, setVerifiedCert] = useState(null);
   const [searched, setSearched] = useState(false);
   const [showCertModal, setShowCertModal] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
 
-  const handleVerify = (e) => {
+  const handleVerify = async (e) => {
     e?.preventDefault();
     const cleanId = certId.trim().toUpperCase();
     if (!cleanId) {
-      addToast('Please enter a certificate ID', 'error');
+      addToast('Please enter a certificate Serial Number', 'error');
       return;
     }
     setSearched(true);
+    setIsVerifying(true);
 
+    // 1. Check live database / dbService
+    const liveCert = await dbService.verifyCertificate(cleanId);
+    setIsVerifying(false);
+
+    if (liveCert) {
+      setVerifiedCert({
+        id: liveCert.serialNumber || liveCert.serial_number,
+        studentName: liveCert.studentName || liveCert.student_name,
+        company: liveCert.companyName || liveCert.company_name,
+        domain: liveCert.domain || liveCert.roleTitle || liveCert.role_title,
+        role: liveCert.roleTitle || liveCert.role_title,
+        issueDate: liveCert.issueDate || liveCert.issue_date,
+        grade: liveCert.grade || 'A+ (Distinction)',
+        skills: ['Milestone Delivery', 'Git Collaboration', 'Production Delivery'],
+        verificationStatus: 'Verified Official Credential'
+      });
+      addToast('Official Certificate authenticated from database!', 'success');
+      return;
+    }
+
+    // 2. Check fallback mock
     if (MOCK_CERTIFICATES[cleanId]) {
       setVerifiedCert(MOCK_CERTIFICATES[cleanId]);
       addToast('Certificate verified successfully!', 'success');
     } else {
-      if (cleanId.startsWith('SG-')) {
-        const dynamicCert = {
-          id: cleanId,
-          studentName: 'Verified SkillGrad Scholar',
-          program: 'Industry Practical Internship Track',
-          company: 'SkillGrad Partner Ecosystem',
-          issueDate: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-          completionGrade: 'Honors (96%)',
-          skillsVerified: ['System Design', 'Production Engineering', 'Agile Architecture'],
-          status: 'Verified & Authentic'
-        };
-        setVerifiedCert(dynamicCert);
-        addToast('Certificate verified successfully!', 'success');
-      } else {
-        setVerifiedCert(null);
-        addToast('No certificate found for this ID. Try SG-2024-8842.', 'error');
-      }
+      setVerifiedCert(null);
+      addToast('No authentic certificate found for this Serial Number.', 'error');
     }
   };
 
@@ -47,15 +56,19 @@ export default function CertificateVerification() {
     <section id="certifications" className="py-24 relative">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-xs font-semibold text-amber-400 mb-3 backdrop-blur-md">
-            <Award className="w-3.5 h-3.5" />
+        <div className="text-center max-w-2xl mx-auto mb-12 animate-slide-up">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-xs font-semibold text-amber-300 mb-3 backdrop-blur-md">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+            </span>
+            <Award className="w-3.5 h-3.5 ml-0.5" />
             Verified Credential System
           </div>
-          <h2 className="text-3xl sm:text-4xl font-extrabold font-display text-white tracking-tight">
-            Certificate Verification
+          <h2 className="text-3xl sm:text-4xl font-extrabold font-display tracking-tight text-white">
+            <span className="flow-gradient-text">Certificate Verification</span>
           </h2>
-          <p className="text-xs sm:text-sm text-slate-400 mt-2">
+          <p className="text-xs sm:text-sm text-slate-300 mt-2">
             Every SkillGrad completion certificate carries a verifiable ID. Authenticate credentials in real-time.
           </p>
         </div>
@@ -81,21 +94,6 @@ export default function CertificateVerification() {
               Verify Credential
             </button>
           </form>
-
-          {/* Quick sample chips */}
-          <div className="mt-4 flex items-center gap-2 text-[11px] text-slate-400">
-            <span>Sample IDs:</span>
-            {['SG-2024-8842', 'SG-2024-9103', 'SG-2024-7731'].map((sample) => (
-              <button
-                key={sample}
-                type="button"
-                onClick={() => { setCertId(sample); }}
-                className="px-2.5 py-0.5 rounded-lg bg-slate-800/80 border border-white/10 text-amber-300 hover:bg-slate-700/80 font-mono text-[10px]"
-              >
-                {sample}
-              </button>
-            ))}
-          </div>
 
           {/* Verified Certificate Result */}
           {searched && verifiedCert && (

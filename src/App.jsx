@@ -1,51 +1,110 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, Suspense, Component } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import RoleSelectScreen from './components/RoleSelectScreen';
-import LoginPage from './components/LoginPage';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import Features from './components/Features';
 import Opportunities from './components/Opportunities';
-import StudentTalentPool from './components/StudentTalentPool';
-import CompanyDashboard from './components/CompanyDashboard';
-import CertificateVerification from './components/CertificateVerification';
-import FAQ from './components/FAQ';
 import ContactUs from './components/ContactUs';
 import Footer from './components/Footer';
 import AuthModal from './components/AuthModal';
 import ToastContainer from './components/Toast';
+import FlowBackground from './components/FlowBackground';
+import LoginPage from './components/LoginPage';
+
+// Code-splitting for secondary panels
+const CompanyDashboard = React.lazy(() => import('./components/CompanyDashboard'));
+const StudentTalentPool = React.lazy(() => import('./components/StudentTalentPool'));
+const CertificateVerification = React.lazy(() => import('./components/CertificateVerification'));
+const FAQ = React.lazy(() => import('./components/FAQ'));
+const MyApplications = React.lazy(() => import('./components/MyApplications'));
+const JoinedInternships = React.lazy(() => import('./components/JoinedInternships'));
+
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('SkillGrad UI Catch:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#08090D] flex flex-col items-center justify-center p-6 text-center text-white">
+          <div className="w-16 h-16 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 text-2xl mb-4">
+            ⚠️
+          </div>
+          <h2 className="text-xl font-bold font-display">Something went wrong</h2>
+          <p className="text-xs text-slate-400 mt-2 max-w-md">
+            {this.state.error?.message || 'An unexpected error occurred while loading this view.'}
+          </p>
+          <button
+            onClick={() => { localStorage.clear(); window.location.reload(); }}
+            className="mt-6 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/25 cursor-pointer"
+          >
+            Reset Session & Reload
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function PageLoader() {
+  return (
+    <div className="min-h-[40vh] flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
 
 function StudentPlatform({ onSwitchRole }) {
   return (
-    <div className="min-h-screen bg-[#06090F] text-slate-100 selection:bg-indigo-500/30 selection:text-indigo-200">
-      <Navbar currentRole="student" onSwitchRole={onSwitchRole} />
-      <main className="pt-18">
-        <Hero />
-        <Features />
-        <Opportunities />
-        <StudentTalentPool />
-        <CertificateVerification />
-        <FAQ />
-        <ContactUs />
-      </main>
-      <Footer />
-      <AuthModal />
-      <ToastContainer />
+    <div className="min-h-screen bg-[#08090D] text-slate-100 selection:bg-indigo-500/30 selection:text-indigo-200 relative overflow-x-hidden">
+      <FlowBackground theme="student" />
+      <div className="relative z-10">
+        <Navbar currentRole="student" onSwitchRole={onSwitchRole} />
+        <main className="pt-16">
+          <Hero />
+          <Features />
+          <Opportunities />
+          <Suspense fallback={<PageLoader />}>
+            <JoinedInternships />
+            <MyApplications />
+            <StudentTalentPool />
+            <CertificateVerification />
+            <FAQ />
+          </Suspense>
+          <ContactUs />
+        </main>
+        <Footer />
+        <AuthModal />
+        <ToastContainer />
+      </div>
     </div>
   );
 }
 
 function CompanyPlatform({ onSwitchRole }) {
   return (
-    <div className="min-h-screen bg-[#06090F] text-slate-100 selection:bg-indigo-500/30 selection:text-indigo-200">
-      <Navbar currentRole="company" onSwitchRole={onSwitchRole} />
-      <main className="pt-18">
-        <CompanyDashboard />
-        <ContactUs />
-      </main>
-      <Footer />
-      <AuthModal />
-      <ToastContainer />
+    <div className="min-h-screen bg-[#08090D] text-slate-100 selection:bg-cyan-500/30 selection:text-cyan-200 relative overflow-x-hidden">
+      <FlowBackground theme="company" />
+      <div className="relative z-10">
+        <Navbar currentRole="company" onSwitchRole={onSwitchRole} />
+        <main className="pt-16">
+          <Suspense fallback={<PageLoader />}>
+            <CompanyDashboard />
+          </Suspense>
+          <ContactUs />
+        </main>
+        <Footer />
+        <AuthModal />
+        <ToastContainer />
+      </div>
     </div>
   );
 }
@@ -53,14 +112,8 @@ function CompanyPlatform({ onSwitchRole }) {
 function AppContent() {
   const { user, loading } = useAuth();
   const [selectedRole, setSelectedRole] = useState(() => {
-    return localStorage.getItem('skillgrad_active_role') || null;
+    return localStorage.getItem('skillgrad_active_role') || 'student';
   });
-  const [isGuest, setIsGuest] = useState(false);
-
-  const handleSelectRole = (role) => {
-    setSelectedRole(role);
-    localStorage.setItem('skillgrad_active_role', role);
-  };
 
   const handleSwitchRole = () => {
     const nextRole = selectedRole === 'student' ? 'company' : 'student';
@@ -70,46 +123,29 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#06090F] flex items-center justify-center text-white">
+      <div className="min-h-screen bg-[#090A0F] flex items-center justify-center text-white">
         <div className="w-8 h-8 border-3 border-primary-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
-  // 1. If not authenticated and no role chosen yet, show Role Selection Screen
-  if (!user && !isGuest && !selectedRole) {
-    return (
-      <>
-        <RoleSelectScreen 
-          onSelectRole={handleSelectRole}
-          onContinueAsGuest={() => {
-            setIsGuest(true);
-            setSelectedRole('student');
-          }}
-        />
-        <ToastContainer />
-      </>
-    );
-  }
-
-  // 2. If not authenticated and role is selected, show tailored Login Page for that role
-  if (!user && !isGuest && selectedRole) {
+  // 1. ALWAYS land on Login Page first whenever not authenticated (No guest exploration option)
+  if (!user) {
     return (
       <>
         <LoginPage 
-          selectedRole={selectedRole}
-          onBackToRoles={() => {
-            setSelectedRole(null);
-            localStorage.removeItem('skillgrad_active_role');
+          onLoginSuccess={(role) => {
+            const finalRole = role || selectedRole || 'student';
+            setSelectedRole(finalRole);
+            localStorage.setItem('skillgrad_active_role', finalRole);
           }}
-          onContinueAsGuest={() => setIsGuest(true)}
         />
         <ToastContainer />
       </>
     );
   }
 
-  // 3. Render Tailored Platform based on role
+  // 2. Render Tailored Platform based on authenticated role
   if (selectedRole === 'company') {
     return <CompanyPlatform onSwitchRole={handleSwitchRole} />;
   }
@@ -119,8 +155,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

@@ -129,17 +129,6 @@ export default function RoleSelectScreen({ onSelectRole, onContinueAsGuest }) {
 
         </div>
 
-        {/* Guest fallback */}
-        <div className="mt-10 text-center">
-          <button
-            type="button"
-            onClick={onContinueAsGuest}
-            className="text-xs text-slate-400 hover:text-white transition-colors"
-          >
-            Just exploring? Continue as Guest →
-          </button>
-        </div>
-
       </div>
     </div>
   );

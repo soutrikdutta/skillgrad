@@ -72,14 +72,18 @@ export default function ContactUs() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
           
           {/* Left Info Column */}
-          <div className="lg:col-span-5 space-y-6">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-primary-500/10 border border-primary-500/30 text-xs font-semibold text-primary-400 backdrop-blur-md">
-              <Mail className="w-3.5 h-3.5" />
+          <div className="lg:col-span-5 space-y-6 animate-slide-left">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/25 text-xs font-semibold text-indigo-300 backdrop-blur-md">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+              </span>
+              <Mail className="w-3.5 h-3.5 ml-0.5" />
               Get in Touch
             </div>
 
-            <h2 className="text-3xl sm:text-4xl font-extrabold font-display text-white tracking-tight">
-              Have Questions? <span className="gradient-text">Let's Connect</span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold font-display tracking-tight text-white">
+              Have Questions? <span className="flow-gradient-text">Let's Connect</span>
             </h2>
 
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
