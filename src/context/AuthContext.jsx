@@ -9,7 +9,17 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState('login');
   const [toasts, setToasts] = useState([]);
+
+  const openAuthModal = (mode = 'login') => {
+    setAuthModalMode(mode);
+    setAuthModalOpen(true);
+  };
+
+  const closeAuthModal = () => {
+    setAuthModalOpen(false);
+  };
 
   // Toast helper
   const addToast = (message, type = 'info') => {
@@ -172,7 +182,54 @@ export function AuthProvider({ children }) {
     return { success: true };
   };
 
-  // 4. Logout
+  // 4. Google Sign-In Flow
+  const loginWithGoogle = async (preferredRole = 'student') => {
+    try {
+      const res = await googleCloudAuth.signInWithGoogle();
+      if (res && res.user) {
+        const users = getRegisteredUsers();
+        const existing = users.find(u => u.email.toLowerCase() === res.user.email.toLowerCase());
+        const finalRole = existing?.role || preferredRole || 'student';
+
+        const sessionUser = {
+          uid: res.user.uid,
+          email: res.user.email,
+          displayName: res.user.displayName || res.user.email.split('@')[0],
+          photoURL: res.user.photoURL || null,
+          role: finalRole,
+          authProvider: 'google.com'
+        };
+
+        if (!existing) {
+          users.push({
+            uid: sessionUser.uid,
+            email: sessionUser.email,
+            displayName: sessionUser.displayName,
+            role: finalRole,
+            registeredAt: new Date().toISOString(),
+            authProvider: 'google.com',
+            photoURL: sessionUser.photoURL
+          });
+          saveRegisteredUsers(users);
+        }
+
+        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(sessionUser));
+        localStorage.setItem('skillgrad_active_role', finalRole);
+        setUser(sessionUser);
+        addToast(`Welcome to SkillGrad, ${sessionUser.displayName}!`, 'success');
+        return { success: true, user: sessionUser };
+      }
+      return { success: false, error: 'Google sign-in could not be completed.' };
+    } catch (err) {
+      console.error('Google Sign-In Error:', err);
+      return { 
+        success: false, 
+        error: err.message || 'Google Sign-In failed. Please ensure your origin is authorized in Google Cloud Console.' 
+      };
+    }
+  };
+
+  // 5. Logout
   const logout = async () => {
     try {
       if (googleCloudAuth && typeof googleCloudAuth.signOut === 'function') {
@@ -190,9 +247,14 @@ export function AuthProvider({ children }) {
     loading,
     loginWithEmail,
     signupWithEmail,
+    loginWithGoogle,
     resetPassword,
     logout,
     authModalOpen,
+    isAuthModalOpen: authModalOpen,
+    authModalMode,
+    openAuthModal,
+    closeAuthModal,
     setAuthModalOpen,
     toasts,
     addToast,

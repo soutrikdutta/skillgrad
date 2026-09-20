@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 
 export default function LoginPage({ onLoginSuccess }) {
-  const { loginWithEmail, signupWithEmail, resetPassword, addToast } = useAuth();
+  const { loginWithEmail, signupWithEmail, resetPassword, loginWithGoogle, addToast } = useAuth();
   const [selectedRole, setSelectedRole] = useState(() => localStorage.getItem('skillgrad_active_role') || 'student');
   const [view, setView] = useState('login');
   const [name, setName] = useState('');
@@ -98,15 +98,17 @@ export default function LoginPage({ onLoginSuccess }) {
     setError('');
     setIsLoading(true);
     try {
-      const res = await googleCloudAuth.signInWithGoogle();
-      if (res && res.user) {
-        const existingUsers = JSON.parse(localStorage.getItem('skillgrad_registered_users') || '[]');
-        const existing = existingUsers.find(u => u.email.toLowerCase() === res.user.email.toLowerCase());
-        addToast(`Signed in as ${res.user.displayName || res.user.email}!`, 'success');
-        if (onLoginSuccess) onLoginSuccess(existing?.role || selectedRole);
+      const res = await loginWithGoogle(selectedRole);
+      if (res && res.success) {
+        if (onLoginSuccess) onLoginSuccess(res.user?.role || selectedRole);
+      } else {
+        setError(res?.error || 'Google Sign-In failed.');
       }
-    } catch (err) { setError(err.message || 'Google Sign-In failed.'); }
-    finally { setIsLoading(false); }
+    } catch (err) {
+      setError(err.message || 'Google Sign-In failed.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
