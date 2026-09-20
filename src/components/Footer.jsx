@@ -1,6 +1,6 @@
 import React from 'react';
 import SkillGradLogo from './SkillGradLogo';
-import { ArrowUp, Github, Twitter, Linkedin, Mail } from 'lucide-react';
+import { ArrowUp, Linkedin } from 'lucide-react';
 
 export default function Footer() {
   const scrollToTop = () => {
@@ -20,14 +20,15 @@ export default function Footer() {
               SkillGrad empowers college students and early-career talent with real-world paid internships, verified credentials, and high-impact industry mentorship.
             </p>
             <div className="flex items-center gap-3 pt-2">
-              <a href="#" className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors">
-                <Github className="w-4 h-4" />
-              </a>
-              <a href="#" className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors">
-                <Twitter className="w-4 h-4" />
-              </a>
-              <a href="#" className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors">
-                <Linkedin className="w-4 h-4" />
+              <a 
+                href="https://www.linkedin.com/in/soutrik-dutta-245b93372"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2.5 rounded-xl bg-slate-900 hover:bg-[#0a66c2]/20 border border-slate-800 hover:border-[#0a66c2]/50 text-slate-400 hover:text-[#0a66c2] transition-all duration-200 group flex items-center gap-2 cursor-pointer shadow-sm active:scale-95"
+                title="Connect on LinkedIn"
+              >
+                <Linkedin className="w-4 h-4 transition-transform group-hover:scale-110" />
+                <span className="text-xs font-semibold">LinkedIn</span>
               </a>
             </div>
           </div>
@@ -72,7 +73,15 @@ export default function Footer() {
           <div className="flex flex-col sm:flex-row items-center gap-2">
             <span>© {new Date().getFullYear()} SkillGrad. All rights reserved. Bridging Skills and Industry.</span>
             <span className="hidden sm:inline text-slate-700">•</span>
-            <span className="text-[11px] text-slate-400 font-mono">made by :- soutrik_2006</span>
+            <a 
+              href="https://www.linkedin.com/in/soutrik-dutta-245b93372" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-[11px] text-slate-400 hover:text-[#0a66c2] font-mono transition-colors hover:underline underline-offset-2"
+              title="Soutrik Dutta's LinkedIn Profile"
+            >
+              made by :- soutrik_2006
+            </a>
           </div>
 
           <div className="flex items-center gap-4">

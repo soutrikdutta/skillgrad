@@ -83,7 +83,15 @@ export default function Navbar({ currentRole = 'student', onSwitchRole }) {
             <span>{isCompany ? 'Employer' : 'Student'}</span>
           </div>
 
-          <span className="hidden lg:inline-block text-[10px] text-slate-500 font-mono">made by :- soutrik_2006</span>
+          <a 
+            href="https://www.linkedin.com/in/soutrik-dutta-245b93372"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden lg:inline-block text-[10px] text-slate-400 hover:text-[#0a66c2] font-mono transition-colors hover:underline underline-offset-2"
+            title="Soutrik Dutta's LinkedIn Profile"
+          >
+            made by :- soutrik_2006
+          </a>
         </div>
 
         {/* Center: Desktop Nav Links */}
@@ -258,7 +266,15 @@ export default function Navbar({ currentRole = 'student', onSwitchRole }) {
 
           {/* Attribution Credit */}
           <div className="pt-3 text-center text-[10px] text-slate-500 font-mono">
-            made by :- soutrik_2006
+            <a 
+              href="https://www.linkedin.com/in/soutrik-dutta-245b93372"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-400 hover:text-[#0a66c2] transition-colors hover:underline underline-offset-2"
+              title="Soutrik Dutta's LinkedIn Profile"
+            >
+              made by :- soutrik_2006
+            </a>
           </div>
         </div>
       </div>

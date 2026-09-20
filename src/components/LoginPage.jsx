@@ -373,7 +373,15 @@ export default function LoginPage({ onLoginSuccess }) {
             <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
             <span>Encrypted credential storage</span>
           </div>
-          <span className="text-[10px] text-slate-400 font-mono tracking-wide">made by :- soutrik_2006</span>
+          <a 
+            href="https://www.linkedin.com/in/soutrik-dutta-245b93372" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="text-[10px] text-slate-400 hover:text-[#0a66c2] font-mono tracking-wide transition-colors hover:underline underline-offset-2"
+            title="Soutrik Dutta's LinkedIn Profile"
+          >
+            made by :- soutrik_2006
+          </a>
         </div>
 
       </div>
