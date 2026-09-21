@@ -71,6 +71,19 @@ export default function CompanyDashboard() {
 
   useEffect(() => {
     loadDashboardData();
+    if (!user) return;
+
+    // Real-time Firestore subscriptions for company data
+    const unsubPostings = dbService.subscribeCompanyPostings(user, (jobs) => {
+      if (jobs) setMyPostings(jobs);
+    });
+    const unsubApplicants = dbService.subscribeCompanyApplicants(user, (apps) => {
+      if (apps) setApplications(apps);
+    });
+    const unsubCerts = dbService.subscribeCompanyCertificates(user, (certs) => {
+      if (certs) setIssuedCerts(certs);
+    });
+
     const handleSync = () => loadDashboardData();
     window.addEventListener('skillgrad_internship_posted', handleSync);
     window.addEventListener('skillgrad_application_submitted', handleSync);
@@ -78,6 +91,9 @@ export default function CompanyDashboard() {
     window.addEventListener('skillgrad_application_status_changed', handleSync);
     window.addEventListener('skillgrad_certificate_issued', handleSync);
     return () => {
+      if (unsubPostings) unsubPostings();
+      if (unsubApplicants) unsubApplicants();
+      if (unsubCerts) unsubCerts();
       window.removeEventListener('skillgrad_internship_posted', handleSync);
       window.removeEventListener('skillgrad_application_submitted', handleSync);
       window.removeEventListener('skillgrad_internship_deleted', handleSync);

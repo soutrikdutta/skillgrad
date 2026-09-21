@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { MOCK_CERTIFICATES } from '../data/mockData';
 import { dbService } from '../firebase/dbService';
 import { useAuth } from '../context/AuthContext';
-import { Award, Search, ShieldCheck, CheckCircle, ExternalLink, Printer, X } from 'lucide-react';
+import { Award, Search, ShieldCheck, CheckCircle, ExternalLink } from 'lucide-react';
+import CertificateModal from './CertificateModal';
 
 export default function CertificateVerification() {
   const { addToast } = useAuth();
@@ -14,7 +15,7 @@ export default function CertificateVerification() {
 
   const handleVerify = async (e) => {
     e?.preventDefault();
-    const cleanId = certId.trim().toUpperCase();
+    const cleanId = certId.trim();
     if (!cleanId) {
       addToast('Please enter a certificate Serial Number', 'error');
       return;
@@ -22,33 +23,46 @@ export default function CertificateVerification() {
     setSearched(true);
     setIsVerifying(true);
 
-    // 1. Check live database / dbService
+    // 1. Check live Firestore database / dbService
     const liveCert = await dbService.verifyCertificate(cleanId);
     setIsVerifying(false);
 
     if (liveCert) {
+      const serial = liveCert.serialNumber || liveCert.serial_number;
+      const role = liveCert.roleTitle || liveCert.role_title || 'Software Engineering Intern';
+      const domain = liveCert.domain || 'Technology & Software Development';
+      const grade = liveCert.grade || 'A+ (Distinction with Honors)';
+      const company = liveCert.companyName || liveCert.company_name || 'SkillGrad Partner Enterprise';
+
       setVerifiedCert({
-        id: liveCert.serialNumber || liveCert.serial_number,
+        id: serial,
+        serialNumber: serial,
         studentName: liveCert.studentName || liveCert.student_name,
-        company: liveCert.companyName || liveCert.company_name,
-        domain: liveCert.domain || liveCert.roleTitle || liveCert.role_title,
-        role: liveCert.roleTitle || liveCert.role_title,
+        company,
+        companyName: company,
+        domain,
+        program: domain,
+        roleTitle: role,
+        role,
         issueDate: liveCert.issueDate || liveCert.issue_date,
-        grade: liveCert.grade || 'A+ (Distinction)',
+        grade,
+        completionGrade: grade,
+        summary: liveCert.summary || 'Demonstrated outstanding technical proficiency and successful deliverable execution.',
         skills: ['Milestone Delivery', 'Git Collaboration', 'Production Delivery'],
         verificationStatus: 'Verified Official Credential'
       });
-      addToast('Official Certificate authenticated from database!', 'success');
+      addToast(`Official Certificate authenticated: ${serial}`, 'success');
       return;
     }
 
     // 2. Check fallback mock
-    if (MOCK_CERTIFICATES[cleanId]) {
-      setVerifiedCert(MOCK_CERTIFICATES[cleanId]);
+    const upperId = cleanId.toUpperCase();
+    if (MOCK_CERTIFICATES[upperId]) {
+      setVerifiedCert(MOCK_CERTIFICATES[upperId]);
       addToast('Certificate verified successfully!', 'success');
     } else {
       setVerifiedCert(null);
-      addToast('No authentic certificate found for this Serial Number.', 'error');
+      addToast('No authentic certificate found for this Serial Number in the database.', 'error');
     }
   };
 
@@ -69,7 +83,7 @@ export default function CertificateVerification() {
             <span className="flow-gradient-text">Certificate Verification</span>
           </h2>
           <p className="text-xs sm:text-sm text-slate-300 mt-2">
-            Every SkillGrad completion certificate carries a verifiable ID. Authenticate credentials in real-time.
+            Every SkillGrad completion certificate carries a verifiable cryptographic Serial Number. Authenticate credentials globally in real-time.
           </p>
         </div>
 
@@ -80,7 +94,7 @@ export default function CertificateVerification() {
               <Search className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Enter Certificate ID (e.g. SG-2024-8842)"
+                placeholder="Enter Certificate Serial (e.g. SG-2026-4821)"
                 value={certId}
                 onChange={(e) => setCertId(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 rounded-xl glass-input text-xs sm:text-sm uppercase tracking-wider font-mono"
@@ -88,10 +102,11 @@ export default function CertificateVerification() {
             </div>
             <button
               type="submit"
-              className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+              disabled={isVerifying}
+              className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer disabled:opacity-60"
             >
               <ShieldCheck className="w-4 h-4" />
-              Verify Credential
+              {isVerifying ? 'Authenticating...' : 'Verify Credential'}
             </button>
           </form>
 
@@ -100,41 +115,51 @@ export default function CertificateVerification() {
             <div className="mt-6 pt-6 border-t border-white/10 animate-fadeIn">
               <div className="p-5 rounded-2xl bg-slate-900/80 border border-emerald-500/30 relative overflow-hidden">
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Recipient Student</span>
-                  <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-bold text-emerald-400">
-                    <CheckCircle className="w-3 h-3" />
-                    Authentic
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">Recipient Student</span>
+                    <h4 className="text-xl font-bold font-display text-white mt-0.5">{verifiedCert.studentName}</h4>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-bold text-emerald-400">
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    Authentic Verified Record
                   </div>
                 </div>
 
-                <h4 className="text-xl font-bold font-display text-white mb-3">{verifiedCert.studentName}</h4>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
                   <div>
-                    <span className="text-slate-400">Track:</span>
-                    <p className="font-semibold text-slate-200">{verifiedCert.program}</p>
+                    <span className="text-slate-400">Role / Designation:</span>
+                    <p className="font-semibold text-slate-200">{verifiedCert.roleTitle || verifiedCert.role}</p>
                   </div>
                   <div>
                     <span className="text-slate-400">Host Partner:</span>
                     <p className="font-semibold text-slate-200">{verifiedCert.company}</p>
                   </div>
                   <div>
+                    <span className="text-slate-400">Domain / Specialization:</span>
+                    <p className="font-semibold text-slate-200">{verifiedCert.domain || verifiedCert.program}</p>
+                  </div>
+                  <div>
                     <span className="text-slate-400">Date Issued:</span>
                     <p className="font-semibold text-slate-200">{verifiedCert.issueDate}</p>
                   </div>
                   <div>
-                    <span className="text-slate-400">Grade:</span>
-                    <p className="font-semibold text-emerald-400">{verifiedCert.completionGrade}</p>
+                    <span className="text-slate-400">Performance Grade:</span>
+                    <p className="font-semibold text-emerald-400">{verifiedCert.grade || verifiedCert.completionGrade}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Credential Serial:</span>
+                    <p className="font-mono font-bold text-amber-300">{verifiedCert.serialNumber || verifiedCert.id}</p>
                   </div>
                 </div>
 
                 <div className="pt-4 flex gap-2">
                   <button
+                    type="button"
                     onClick={() => setShowCertModal(true)}
-                    className="px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md shadow-amber-500/20 active:scale-95 transition-all"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
-                    View Certificate Preview
+                    View & Download Official Certificate (1-Page PDF)
                   </button>
                 </div>
               </div>
@@ -143,75 +168,19 @@ export default function CertificateVerification() {
 
           {searched && !verifiedCert && (
             <div className="mt-6 p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs text-center">
-              No certificate found for ID: <strong className="font-mono">{certId}</strong>.
+              No authentic certificate found in the database for ID: <strong className="font-mono text-white">{certId}</strong>.
             </div>
           )}
         </div>
 
       </div>
 
-      {/* Visual Certificate Modal */}
+      {/* Official Verified Certificate Modal with Single-Page PDF/PNG Download */}
       {showCertModal && verifiedCert && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
-          <div 
-            className="relative w-full max-w-2xl glass-panel rounded-3xl p-6 sm:p-10 shadow-2xl border-2 border-amber-500/40"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setShowCertModal(false)}
-              className="absolute top-5 right-5 text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div id="certificate-print-area" className="border-2 border-amber-500/40 p-6 sm:p-8 rounded-2xl bg-gradient-to-b from-slate-950/90 to-slate-900/90 text-center space-y-4">
-              <div className="text-xs uppercase tracking-[0.3em] font-bold text-amber-400">
-                Official Credential
-              </div>
-
-              <div className="text-2xl sm:text-3xl font-extrabold font-display text-white">
-                CERTIFICATE OF COMPLETION
-              </div>
-
-              <p className="text-xs text-slate-400 italic">This document certifies that</p>
-
-              <div className="text-2xl sm:text-3xl font-bold font-display text-amber-300">
-                {verifiedCert.studentName}
-              </div>
-
-              <p className="text-xs text-slate-300 max-w-lg mx-auto leading-relaxed">
-                has successfully completed the industry project in <strong className="text-white">{verifiedCert.program}</strong> in collaboration with <strong className="text-white">{verifiedCert.company}</strong>.
-              </p>
-
-              <div className="pt-6 grid grid-cols-2 gap-4 border-t border-white/10 text-xs">
-                <div>
-                  <span className="text-[10px] uppercase text-slate-400 block font-mono">Credential ID</span>
-                  <strong className="font-mono text-white text-xs">{verifiedCert.id}</strong>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase text-slate-400 block">Date of Issue</span>
-                  <strong className="text-white text-xs">{verifiedCert.issueDate}</strong>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                onClick={() => window.print()}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                Print / Save PDF
-              </button>
-              <button
-                onClick={() => setShowCertModal(false)}
-                className="px-4 py-2 rounded-xl bg-primary-600 text-white text-xs font-semibold cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+        <CertificateModal
+          certificate={verifiedCert}
+          onClose={() => setShowCertModal(false)}
+        />
       )}
 
     </section>

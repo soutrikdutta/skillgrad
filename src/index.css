@@ -455,90 +455,78 @@ body {
   }
 }
 
-/* ===================== Print Styles — Certificate Only ===================== */
+/* ===================== Print Styles — Certificate Only (Strict 1-Page) ===================== */
 @media print {
-  /* Hide the entire page content */
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  /* Hide everything in body */
   body * {
     visibility: hidden !important;
   }
 
-  /* Show only the certificate print area and its children */
+  /* Show only certificate area */
   #certificate-print-area,
   #certificate-print-area * {
     visibility: visible !important;
   }
 
-  /* Position the certificate to fill the page */
+  /* Position absolute on page 1 only - avoids position:fixed repeating on multiple pages */
   #certificate-print-area {
-    position: fixed !important;
+    position: absolute !important;
     left: 0 !important;
     top: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    padding: 2.5rem !important;
-    margin: 0 !important;
-    background: #ffffff !important;
-    color: #111827 !important;
-    z-index: 99999 !important;
-    border: 3px solid #d97706 !important;
-    border-radius: 0 !important;
+    width: 100% !important;
+    height: 98% !important;
+    max-width: 280mm !important;
+    max-height: 195mm !important;
+    padding: 24px !important;
+    margin: 0 auto !important;
+    background: #fcfbf7 !important;
+    color: #0f172a !important;
+    z-index: 999999 !important;
+    box-sizing: border-box !important;
+    page-break-inside: avoid !important;
+    page-break-after: avoid !important;
+    page-break-before: avoid !important;
+    break-inside: avoid !important;
+    break-after: avoid !important;
+    overflow: hidden !important;
     box-shadow: none !important;
-    overflow: visible !important;
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: center !important;
   }
 
-  /* Make all text dark and readable on white background */
+  /* Force dark contrast on white print */
+  #certificate-print-area h1,
   #certificate-print-area h2,
   #certificate-print-area h3,
   #certificate-print-area strong {
-    color: #111827 !important;
-    -webkit-text-fill-color: #111827 !important;
+    color: #0f172a !important;
+    -webkit-text-fill-color: #0f172a !important;
     background: none !important;
     background-clip: unset !important;
     -webkit-background-clip: unset !important;
   }
 
-  #certificate-print-area span,
+  #certificate-print-area h2 {
+    color: #1e3a8a !important;
+    -webkit-text-fill-color: #1e3a8a !important;
+  }
+
   #certificate-print-area p,
-  #certificate-print-area div {
-    color: #374151 !important;
-    background: transparent !important;
+  #certificate-print-area span {
+    color: #334155 !important;
   }
 
-  #certificate-print-area .text-amber-300,
-  #certificate-print-area .text-amber-400 {
-    color: #b45309 !important;
-  }
-
-  #certificate-print-area .text-emerald-400 {
-    color: #059669 !important;
-  }
-
-  /* Force borders to be visible */
-  #certificate-print-area [class*="border"] {
-    border-color: #d1d5db !important;
-  }
-
-  /* Hide decorative blurs and watermarks */
-  #certificate-print-area .bg-grid-pattern,
-  #certificate-print-area .blur-3xl,
-  #certificate-print-area .filter {
-    display: none !important;
-  }
-
-  /* Hide background animations and overlays */
-  .bg-black\/85,
-  .bg-black\/80,
-  .backdrop-blur-md {
-    background: transparent !important;
-    backdrop-filter: none !important;
-  }
-
-  /* Ensure single page */
+  /* Strict 1-Page A4 Landscape */
   @page {
     size: A4 landscape;
-    margin: 0.5cm;
+    margin: 8mm;
   }
 }

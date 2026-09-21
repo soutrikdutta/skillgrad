@@ -36,13 +36,14 @@ export default function Opportunities() {
   const [applicationSuccess, setApplicationSuccess] = useState(false);
   const [modalError, setModalError] = useState('');
 
-  // Load active internships on mount & listen for live events
+  // Load active internships on mount & listen for real-time Firestore sync
   useEffect(() => {
     setInternships(dbService.getInternships());
 
-    dbService.fetchLiveInternships().then((jobs) => {
-      if (jobs && Array.isArray(jobs)) {
-        setInternships(jobs);
+    // Subscribe to real-time Firestore updates across all connected users
+    const unsubscribe = dbService.subscribeLiveInternships((liveJobs) => {
+      if (liveJobs && Array.isArray(liveJobs)) {
+        setInternships(liveJobs);
       }
     });
 
@@ -65,6 +66,7 @@ export default function Opportunities() {
     window.addEventListener('skillgrad_internship_posted', handleNewInternship);
     window.addEventListener('skillgrad_application_submitted', handleNewApplication);
     return () => {
+      if (unsubscribe) unsubscribe();
       window.removeEventListener('skillgrad_internship_posted', handleNewInternship);
       window.removeEventListener('skillgrad_application_submitted', handleNewApplication);
     };

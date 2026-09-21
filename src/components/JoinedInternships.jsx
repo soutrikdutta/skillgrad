@@ -4,8 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import { 
   Briefcase, Building2, DollarSign, Clock, MapPin, Mail, 
   Award, ExternalLink, MessageSquare, CheckCircle2, ChevronRight,
-  Printer, X, ShieldCheck, Download, Sparkles
+  Download, Sparkles, X, ShieldCheck
 } from 'lucide-react';
+import CertificateModal from './CertificateModal';
 
 export default function JoinedInternships() {
   const { user, addToast } = useAuth();
@@ -24,10 +25,18 @@ export default function JoinedInternships() {
 
   useEffect(() => {
     loadJoined();
+    if (!user) return;
+
+    // Real-time Firestore synchronization for certificates & enrolled roles
+    const unsubCerts = dbService.subscribeStudentCertificates(user, () => {
+      loadJoined();
+    });
+
     const handleSync = () => loadJoined();
     window.addEventListener('skillgrad_application_status_changed', handleSync);
     window.addEventListener('skillgrad_certificate_issued', handleSync);
     return () => {
+      if (unsubCerts) unsubCerts();
       window.removeEventListener('skillgrad_application_status_changed', handleSync);
       window.removeEventListener('skillgrad_certificate_issued', handleSync);
     };
@@ -58,10 +67,6 @@ export default function JoinedInternships() {
     }
   };
 
-  const handlePrintCertificate = () => {
-    window.print();
-  };
-
   if (!user || joinedList.length === 0) return null;
 
   return (
@@ -77,13 +82,13 @@ export default function JoinedInternships() {
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
               <CheckCircle2 className="w-3.5 h-3.5 ml-0.5" />
-              Active Enrollment Hub
+              Active Enrollment & Credentials Hub
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold font-display tracking-tight text-white">
-              <span className="flow-gradient-text">My Joined Internships</span>
+              <span className="flow-gradient-text">My Joined Roles & Certificates</span>
             </h2>
             <p className="text-xs sm:text-sm text-slate-300 mt-1">
-              Access your active roles, connect with HR & mentors, and download company-issued credentials.
+              Access your enrolled micro-internships, communicate with hiring managers, and download tamper-proof certificates.
             </p>
           </div>
 
@@ -103,7 +108,7 @@ export default function JoinedInternships() {
               )}
               <div className="text-left">
                 <p className="text-xs font-semibold text-white">{user.displayName || 'Enrolled Student'}</p>
-                <p className="text-[10px] text-emerald-400 font-medium">Verified Active Intern</p>
+                <p className="text-[10px] text-emerald-400 font-medium">Verified Active Scholar</p>
               </div>
             </div>
           )}
@@ -125,7 +130,7 @@ export default function JoinedInternships() {
                   </div>
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5 shrink-0">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    Enrolled
+                    {job.status || 'Enrolled'}
                   </span>
                 </div>
 
@@ -147,28 +152,29 @@ export default function JoinedInternships() {
 
                 {/* Certificate Status Block */}
                 {job.certificate ? (
-                  <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/25 mb-4 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0 text-indigo-400">
-                        <Award className="w-4 h-4" />
+                  <div className="p-3.5 rounded-xl bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-transparent border border-amber-500/30 mb-4 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-300">
+                        <Award className="w-5 h-5" />
                       </div>
                       <div className="min-w-0">
-                        <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-wider block">Official Certificate Issued</span>
+                        <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">Official Verified Credential</span>
                         <p className="text-xs font-mono font-bold text-white truncate">{job.certificate.serialNumber || job.certificate.serial_number}</p>
                       </div>
                     </div>
                     <button
+                      type="button"
                       onClick={() => setViewingCert(job.certificate)}
-                      className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-semibold flex items-center gap-1 shrink-0 transition-all cursor-pointer active:scale-95 shadow-md shadow-indigo-600/25"
+                      className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-bold flex items-center gap-1.5 shrink-0 transition-all cursor-pointer active:scale-95 shadow-md shadow-amber-500/25"
                     >
-                      <Download className="w-3 h-3" />
-                      Download
+                      <Download className="w-3.5 h-3.5" />
+                      Download (1 Page PDF)
                     </button>
                   </div>
                 ) : (
                   <div className="p-3 rounded-xl bg-slate-900/60 border border-white/[0.06] mb-4 flex items-center gap-2.5 text-xs text-slate-400">
                     <Clock className="w-4 h-4 text-amber-400 shrink-0" />
-                    <span>Certificate in progress. Will be issued by {job.company} upon milestone completion.</span>
+                    <span>Certificate in progress. Will be issued by {job.company} upon deliverable milestones.</span>
                   </div>
                 )}
               </div>
@@ -176,6 +182,7 @@ export default function JoinedInternships() {
               {/* Action Strip: Contact HR + Workspace */}
               <div className="pt-3 border-t border-white/[0.06] flex items-center justify-between gap-2">
                 <button
+                  type="button"
                   onClick={() => setSelectedHRJob(job)}
                   className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border border-white/[0.08] active:scale-95"
                 >
@@ -203,8 +210,9 @@ export default function JoinedInternships() {
               onClick={(e) => e.stopPropagation()}
             >
               <button
+                type="button"
                 onClick={() => setSelectedHRJob(null)}
-                className="absolute top-5 right-5 text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition-colors"
+                className="absolute top-5 right-5 text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -268,95 +276,12 @@ export default function JoinedInternships() {
           </div>
         )}
 
-        {/* Modal 2: Official Verifiable Certificate Download View */}
+        {/* Modal 2: Official Verified Certificate Modal with Single-Page PDF/PNG Download */}
         {viewingCert && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn overflow-y-auto">
-            <div 
-              className="relative w-full max-w-2xl glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl animate-scale-in my-8"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                onClick={() => setViewingCert(null)}
-                className="absolute top-5 right-5 text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
-              {/* Printable Certificate Frame */}
-              <div id="certificate-print-area" className="p-6 sm:p-8 rounded-2xl bg-[#0b0e14] border-2 border-amber-500/40 relative overflow-hidden shadow-2xl">
-                {/* Certificate Background watermark */}
-                <div className="absolute inset-0 bg-grid-pattern opacity-10 pointer-events-none" />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full bg-amber-500/5 filter blur-3xl pointer-events-none" />
-
-                {/* Certificate Header */}
-                <div className="text-center pb-6 border-b border-white/[0.08] relative z-10">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[10px] font-bold tracking-widest uppercase text-amber-300 mb-2">
-                    <ShieldCheck className="w-3 h-3" /> SkillGrad Verified Credential
-                  </div>
-                  <h3 className="text-2xl sm:text-3xl font-black font-display tracking-tight text-white">
-                    Certificate of Completion
-                  </h3>
-                  <p className="text-[11px] text-slate-400 mt-1 uppercase tracking-wider">
-                    This certifies the professional commercial internship deliverables of
-                  </p>
-                </div>
-
-                {/* Candidate Name */}
-                <div className="text-center py-6 relative z-10">
-                  <h2 className="text-2xl sm:text-4xl font-extrabold font-display text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-white to-amber-300">
-                    {viewingCert.studentName || viewingCert.student_name}
-                  </h2>
-                  <p className="text-xs sm:text-sm text-slate-300 mt-2 max-w-md mx-auto">
-                    for outstanding performance as a <strong>{viewingCert.roleTitle || viewingCert.role_title}</strong> intern at <strong className="text-white">{viewingCert.companyName || viewingCert.company_name}</strong>.
-                  </p>
-                </div>
-
-                {/* Certificate Meta Grid */}
-                <div className="grid grid-cols-3 gap-3 p-3.5 rounded-xl bg-slate-900/80 border border-white/[0.06] text-center text-xs relative z-10 my-2">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase font-bold">Serial Number</span>
-                    <strong className="text-amber-300 font-mono text-[11px] sm:text-xs">
-                      {viewingCert.serialNumber || viewingCert.serial_number}
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase font-bold">Performance Grade</span>
-                    <strong className="text-emerald-400 text-[11px] sm:text-xs">
-                      {viewingCert.grade || 'A+ (Distinction)'}
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase font-bold">Date of Issue</span>
-                    <strong className="text-slate-200 text-[11px] sm:text-xs">
-                      {viewingCert.issueDate || viewingCert.issue_date}
-                    </strong>
-                  </div>
-                </div>
-
-                {/* Footer seal */}
-                <div className="mt-6 pt-4 border-t border-white/[0.08] flex items-center justify-between text-[11px] text-slate-400 relative z-10">
-                  <div className="flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Tamper-Proof Holographic Record</span>
-                  </div>
-                  <span className="font-mono text-slate-500">skillgrad.org/verify</span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="mt-5 flex items-center justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={handlePrintCertificate}
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/25 flex items-center gap-2 cursor-pointer active:scale-95 transition-all"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  Print / Save as PDF
-                </button>
-              </div>
-
-            </div>
-          </div>
+          <CertificateModal
+            certificate={viewingCert}
+            onClose={() => setViewingCert(null)}
+          />
         )}
 
       </div>

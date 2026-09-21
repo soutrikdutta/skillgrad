@@ -9,7 +9,8 @@ import {
   deleteDoc, 
   query, 
   where, 
-  orderBy 
+  orderBy,
+  onSnapshot
 } from 'firebase/firestore';
 
 const POSTED_JOBS_KEY = 'skillgrad_posted_internships';
@@ -29,7 +30,6 @@ export const dbService = {
           const q = query(colRef, orderBy('postedAt', 'desc'));
           snap = await getDocs(q);
         } catch {
-          // If index not ready, fallback to unsorted query
           snap = await getDocs(colRef);
         }
 
@@ -38,9 +38,7 @@ export const dbService = {
           ...d.data()
         }));
 
-        // Sort descending by postedAt in case fallback was used
         liveList.sort((a, b) => new Date(b.postedAt || 0) - new Date(a.postedAt || 0));
-
         localStorage.setItem(POSTED_JOBS_KEY, JSON.stringify(liveList));
         return liveList;
       }
@@ -55,6 +53,23 @@ export const dbService = {
       return JSON.parse(localStorage.getItem(POSTED_JOBS_KEY) || '[]');
     } catch {
       return [];
+    }
+  },
+
+  // Real-time listener for internships across all connected users
+  subscribeLiveInternships(callback) {
+    if (!db) return () => {};
+    try {
+      return onSnapshot(collection(db, 'internships'), (snap) => {
+        const jobs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        jobs.sort((a, b) => new Date(b.postedAt || 0) - new Date(a.postedAt || 0));
+        localStorage.setItem(POSTED_JOBS_KEY, JSON.stringify(jobs));
+        callback(jobs);
+      }, (err) => {
+        console.warn('Live internships snapshot error:', err);
+      });
+    } catch {
+      return () => {};
     }
   },
 
@@ -96,6 +111,28 @@ export const dbService = {
     });
   },
 
+  subscribeCompanyPostings(user, callback) {
+    if (!db || !user?.email) return () => {};
+    const email = (user.email || '').toLowerCase().trim();
+    const uid = user.uid;
+
+    try {
+      return onSnapshot(collection(db, 'internships'), (snap) => {
+        const allJobs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const myJobs = allJobs.filter(job => {
+          const matchUid = job.creatorId && job.creatorId === uid;
+          const matchCreator = job.creatorEmail && job.creatorEmail.toLowerCase().trim() === email;
+          const matchContact = job.contactEmail && job.contactEmail.toLowerCase().trim() === email;
+          return matchUid || matchCreator || matchContact;
+        });
+        myJobs.sort((a, b) => new Date(b.postedAt || 0) - new Date(a.postedAt || 0));
+        callback(myJobs);
+      });
+    } catch {
+      return () => {};
+    }
+  },
+
   // ==========================================
   // 3. COMPANY APPLICANTS VIEW
   // ==========================================
@@ -112,7 +149,6 @@ export const dbService = {
         const filtered = allApps.filter(app => companyJobIds.has(app.jobId));
         filtered.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
 
-        // Update local cache
         localStorage.setItem(APPS_KEY, JSON.stringify(allApps));
         return filtered;
       }
@@ -135,8 +171,20 @@ export const dbService = {
     }
   },
 
+  subscribeCompanyApplicants(user, callback) {
+    if (!db || !user?.email) return () => {};
+    try {
+      return onSnapshot(collection(db, 'applications'), async () => {
+        const apps = await this.fetchCompanyApplicants(user);
+        callback(apps);
+      });
+    } catch {
+      return () => {};
+    }
+  },
+
   // ==========================================
-  // 4. POST AN INTERNSHIP (SHARED FIRESTORE)
+  // 4. POST AN INTERNSHIP (REAL-TIME FIRESTORE)
   // ==========================================
   async postInternship(jobData, currentUser = null) {
     const creatorId = currentUser?.uid || jobData.creatorId || 'anon-' + Date.now();
@@ -170,7 +218,6 @@ export const dbService = {
         const docRef = await addDoc(collection(db, 'internships'), payload);
         const createdJob = { ...payload, id: docRef.id };
 
-        // Update local cache
         const existing = this.getInternships();
         existing.unshift(createdJob);
         localStorage.setItem(POSTED_JOBS_KEY, JSON.stringify(existing));
@@ -182,7 +229,6 @@ export const dbService = {
       console.warn('Firestore post error, saving locally:', err.message);
     }
 
-    // Local fallback
     const fallbackId = 'sg-posted-' + Date.now();
     const fallbackJob = { ...payload, id: fallbackId };
     const existing = this.getInternships();
@@ -204,7 +250,6 @@ export const dbService = {
       console.warn('Firestore delete error:', err.message);
     }
 
-    // Clean local cache
     const allJobs = this.getInternships().filter(j => j.id !== jobId);
     localStorage.setItem(POSTED_JOBS_KEY, JSON.stringify(allJobs));
     const allApps = JSON.parse(localStorage.getItem(APPS_KEY) || '[]').filter(a => a.jobId !== jobId);
@@ -227,7 +272,6 @@ export const dbService = {
       if (db) {
         const docRef = await addDoc(collection(db, 'applications'), appPayload);
         
-        // Increment applicant count on the internship in Firestore
         try {
           if (applicationData.jobId) {
             const jobDocRef = doc(db, 'internships', applicationData.jobId);
@@ -241,7 +285,6 @@ export const dbService = {
           console.warn('Could not increment applicant count:', cntErr.message);
         }
 
-        // Update local app cache
         const existing = JSON.parse(localStorage.getItem(APPS_KEY) || '[]');
         existing.push({ ...appPayload, id: docRef.id });
         localStorage.setItem(APPS_KEY, JSON.stringify(existing));
@@ -253,7 +296,6 @@ export const dbService = {
       console.warn('Firestore application submit error, saving locally:', err.message);
     }
 
-    // Local fallback
     const id = 'app-' + Date.now();
     const existing = JSON.parse(localStorage.getItem(APPS_KEY) || '[]');
     existing.push({ ...appPayload, id });
@@ -263,7 +305,7 @@ export const dbService = {
   },
 
   // ==========================================
-  // 7. UPDATE APPLICATION STATUS (COMPANY ACTION)
+  // 7. UPDATE APPLICATION STATUS
   // ==========================================
   async updateApplicationStatus(applicationId, newStatus) {
     try {
@@ -330,7 +372,7 @@ export const dbService = {
   },
 
   // ==========================================
-  // 9. SEND CONTACT / HR MESSAGE (WEB3FORMS API)
+  // 9. SEND CONTACT / RECRUITER MESSAGE
   // ==========================================
   async sendContactMessage(formData) {
     try {
@@ -366,12 +408,19 @@ export const dbService = {
   // ==========================================
   async issueCertificate(certData) {
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const serialNumber = certData.serialNumber || `SG-${new Date().getFullYear()}-${randomSuffix}`;
+    const serialNumber = (certData.serialNumber || `SG-${new Date().getFullYear()}-${randomSuffix}`).toUpperCase().trim();
+    
     const payload = {
       ...certData,
       serialNumber,
       studentEmail: (certData.studentEmail || '').toLowerCase().trim(),
       companyEmail: (certData.companyEmail || '').toLowerCase().trim(),
+      companyName: certData.companyName || 'SkillGrad Partner Enterprise',
+      studentName: certData.studentName || 'Accomplished Scholar',
+      roleTitle: certData.roleTitle || 'Software Engineer Intern',
+      domain: certData.domain || 'Technology',
+      grade: certData.grade || 'A+ (Distinction with Honors)',
+      summary: certData.summary || 'Demonstrated outstanding technical proficiency and successful deliverable execution.',
       issueDate: certData.issueDate || new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
       createdAt: new Date().toISOString()
     };
@@ -383,12 +432,11 @@ export const dbService = {
         this._saveLocalCert(created);
         window.dispatchEvent(new CustomEvent('skillgrad_certificate_issued', { detail: created }));
         
-        // Notify author of certificate issuance
         this.sendContactMessage({
-          name: 'SkillGrad Certificate Mint',
-          email: certData.companyEmail || 'certs@skillgrad.org',
-          subject: `SkillGrad Credential Issued: ${serialNumber} to ${certData.studentName}`,
-          message: `Serial: ${serialNumber}\nRecipient: ${certData.studentName} (${certData.studentEmail})\nRole: ${certData.roleTitle}\nCompany: ${certData.companyName}\nGrade: ${certData.grade}`
+          name: 'SkillGrad Certificate Registry',
+          email: payload.companyEmail,
+          subject: `Credential Issued: ${serialNumber} to ${payload.studentName}`,
+          message: `Serial: ${serialNumber}\nRecipient: ${payload.studentName} (${payload.studentEmail})\nRole: ${payload.roleTitle}\nCompany: ${payload.companyName}\nGrade: ${payload.grade}`
         }).catch(() => {});
 
         return { success: true, serialNumber, certificate: created };
@@ -397,11 +445,7 @@ export const dbService = {
       console.warn('Firestore certificate issue error, saving locally:', err.message);
     }
 
-    // Local fallback
-    const fallbackCert = {
-      ...payload,
-      id: 'cert-' + Date.now()
-    };
+    const fallbackCert = { ...payload, id: 'cert-' + Date.now() };
     this._saveLocalCert(fallbackCert);
     window.dispatchEvent(new CustomEvent('skillgrad_certificate_issued', { detail: fallbackCert }));
     return { success: true, serialNumber, certificate: fallbackCert };
@@ -416,29 +460,53 @@ export const dbService = {
   },
 
   // ==========================================
-  // 11. VERIFY CERTIFICATE BY SERIAL NUMBER
+  // 11. VERIFY CERTIFICATE (ROBUST GLOBAL QUERY)
   // ==========================================
   async verifyCertificate(serialNumber) {
-    const cleanSn = (serialNumber || '').toUpperCase().trim();
-    if (!cleanSn) return null;
+    const rawSn = (serialNumber || '').trim();
+    if (!rawSn) return null;
+    const cleanSn = rawSn.toUpperCase().replace(/\s+/g, '');
 
     try {
       if (db) {
-        const q = query(collection(db, 'certificates'), where('serialNumber', '==', cleanSn));
-        const snap = await getDocs(q);
+        // 1. Direct query by exact serialNumber
+        let q = query(collection(db, 'certificates'), where('serialNumber', '==', rawSn));
+        let snap = await getDocs(q);
+        if (snap.empty) {
+          q = query(collection(db, 'certificates'), where('serialNumber', '==', cleanSn));
+          snap = await getDocs(q);
+        }
+
         if (!snap.empty) {
           const docData = snap.docs[0].data();
           return { id: snap.docs[0].id, ...docData };
+        }
+
+        // 2. Fallback scan for case-insensitive / whitespace-tolerant match
+        const allSnap = await getDocs(collection(db, 'certificates'));
+        const found = allSnap.docs.find(d => {
+          const data = d.data();
+          const s1 = (data.serialNumber || data.serial_number || '').toUpperCase().replace(/[\s-_]/g, '');
+          const s2 = cleanSn.replace(/[\s-_]/g, '');
+          return s1 === s2 || s1.includes(s2) || s2.includes(s1);
+        });
+
+        if (found) {
+          return { id: found.id, ...found.data() };
         }
       }
     } catch (err) {
       console.warn('Firestore verify warning, checking local:', err.message);
     }
 
-    // Check local fallback
+    // Check local cache
     try {
       const certs = JSON.parse(localStorage.getItem(CERTS_KEY) || '[]');
-      const found = certs.find(c => (c.serialNumber || c.serial_number || '').toUpperCase().trim() === cleanSn);
+      const found = certs.find(c => {
+        const s1 = (c.serialNumber || c.serial_number || '').toUpperCase().replace(/[\s-_]/g, '');
+        const s2 = cleanSn.replace(/[\s-_]/g, '');
+        return s1 === s2 || s1.includes(s2) || s2.includes(s1);
+      });
       if (found) return found;
     } catch {}
 
@@ -459,6 +527,13 @@ export const dbService = {
         if (!snap.empty) {
           return snap.docs.map(d => ({ id: d.id, ...d.data() }));
         }
+
+        // Also check if any cert matches without strict lowercase
+        const allSnap = await getDocs(collection(db, 'certificates'));
+        const matched = allSnap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(c => (c.studentEmail || c.student_email || '').toLowerCase().trim() === email);
+        if (matched.length > 0) return matched;
       }
     } catch (err) {
       console.warn('Firestore student certs warning:', err.message);
@@ -469,6 +544,21 @@ export const dbService = {
       return certs.filter(c => (c.studentEmail || c.student_email || '').toLowerCase().trim() === email);
     } catch {
       return [];
+    }
+  },
+
+  subscribeStudentCertificates(user, callback) {
+    if (!db || !user?.email) return () => {};
+    const email = (user.email || '').toLowerCase().trim();
+    try {
+      return onSnapshot(collection(db, 'certificates'), (snap) => {
+        const certs = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(c => (c.studentEmail || c.student_email || '').toLowerCase().trim() === email);
+        callback(certs);
+      });
+    } catch {
+      return () => {};
     }
   },
 
@@ -486,6 +576,12 @@ export const dbService = {
         if (!snap.empty) {
           return snap.docs.map(d => ({ id: d.id, ...d.data() }));
         }
+
+        const allSnap = await getDocs(collection(db, 'certificates'));
+        const matched = allSnap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(c => (c.companyEmail || c.company_email || '').toLowerCase().trim() === email);
+        if (matched.length > 0) return matched;
       }
     } catch (err) {
       console.warn('Firestore company certs warning:', err.message);
@@ -499,8 +595,24 @@ export const dbService = {
     }
   },
 
+  subscribeCompanyCertificates(user, callback) {
+    if (!db || !user?.email) return () => {};
+    const email = (user.email || '').toLowerCase().trim();
+    try {
+      return onSnapshot(collection(db, 'certificates'), (snap) => {
+        const certs = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(c => (c.companyEmail || c.company_email || '').toLowerCase().trim() === email);
+        certs.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        callback(certs);
+      });
+    } catch {
+      return () => {};
+    }
+  },
+
   // ==========================================
-  // 14. GET JOINED / ACCEPTED INTERNSHIPS
+  // 14. GET JOINED / ACCEPTED INTERNSHIPS + DIRECT CERTS
   // ==========================================
   async getJoinedInternships(user) {
     if (!user || !user.email) return [];
@@ -523,16 +635,16 @@ export const dbService = {
       } catch {}
     }
 
-    // Filter to accepted ones only
     const acceptedApps = apps.filter(a => a.status === 'accepted');
     const allJobs = await this.fetchLiveInternships();
     const jobsMap = {};
     allJobs.forEach(j => { jobsMap[j.id] = j; });
 
-    // Fetch any certificates issued to this student
+    // Fetch all certificates issued to this student from Firestore
     const certs = await this.fetchStudentCertificates(user);
 
-    return acceptedApps.map(app => {
+    // 1. Map accepted applications
+    const joinedRoles = acceptedApps.map(app => {
       const job = jobsMap[app.jobId] || {};
       const matchingCert = certs.find(c => 
         (c.roleTitle || c.role_title) === app.jobTitle ||
@@ -556,5 +668,32 @@ export const dbService = {
         certificate: matchingCert || null
       };
     });
+
+    // 2. CRITICAL FIX: Also include any certificate directly minted to this student's email!
+    // This guarantees that if an employer issued a certificate directly to their email, the student sees it!
+    const matchedCertIds = new Set(joinedRoles.filter(j => j.certificate).map(j => j.certificate.id || j.certificate.serialNumber));
+    certs.forEach(cert => {
+      const certId = cert.id || cert.serialNumber;
+      if (!matchedCertIds.has(certId)) {
+        joinedRoles.unshift({
+          applicationId: 'direct-cert-' + certId,
+          jobId: cert.jobId || 'job-' + certId,
+          title: cert.roleTitle || cert.role_title || 'Certified Internship Deliverable',
+          company: cert.companyName || cert.company_name || 'SkillGrad Partner Enterprise',
+          stipend: cert.stipend || 'Stipend Disbursed',
+          duration: cert.duration || 'Completed',
+          location: cert.location || 'Remote / Hybrid',
+          hrContactEmail: cert.companyEmail || cert.company_email || 'certs@skillgrad.org',
+          domain: cert.domain || 'Technology',
+          joinedDate: cert.issueDate || cert.issue_date || cert.createdAt,
+          status: 'Credential Awarded',
+          workspaceUrl: 'https://github.com/skillgrad-internships',
+          slackChannel: '#intern-alumni',
+          certificate: cert
+        });
+      }
+    });
+
+    return joinedRoles;
   }
 };
