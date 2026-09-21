@@ -6,7 +6,7 @@ import {
   Building2, PlusCircle, Users, Briefcase, Clock, DollarSign, MapPin,
   CheckCircle2, ExternalLink, Mail, GraduationCap, Sparkles, Filter,
   Eye, ShieldCheck, Trash2, UserCheck, UserX, XCircle, AlertCircle,
-  Award, Copy, Check, FileBadge, Send
+  Award, Copy, Check, FileBadge, Send, X
 } from 'lucide-react';
 
 export default function CompanyDashboard() {
@@ -41,6 +41,12 @@ export default function CompanyDashboard() {
   const [certSubmitting, setCertSubmitting] = useState(false);
   const [justIssuedSerial, setJustIssuedSerial] = useState(null);
   const [copiedSerial, setCopiedSerial] = useState(false);
+
+  // Email Candidate Modal State
+  const [selectedEmailApplicant, setSelectedEmailApplicant] = useState(null);
+  const [candidateEmailSubject, setCandidateEmailSubject] = useState('');
+  const [candidateEmailMessage, setCandidateEmailMessage] = useState('');
+  const [candidateEmailSending, setCandidateEmailSending] = useState(false);
 
   const loadDashboardData = () => {
     if (!user) {
@@ -174,6 +180,38 @@ export default function CompanyDashboard() {
     setCopiedSerial(true);
     addToast('Serial Number copied to clipboard!', 'success');
     setTimeout(() => setCopiedSerial(false), 2000);
+  };
+
+  const handleOpenEmailModal = (app) => {
+    setSelectedEmailApplicant(app);
+    setCandidateEmailSubject(`SkillGrad Update: ${app.jobTitle || 'Internship Application'}`);
+    setCandidateEmailMessage(`Hello ${app.name},\n\nWe have reviewed your application for the ${app.jobTitle || 'Internship'} position at ${cName || user?.displayName || 'our organization'} on SkillGrad.\n\nWe are impressed with your profile and would love to connect for the next evaluation step. Please reply to this message with your availability for a brief technical discussion.\n\nBest regards,\n${cName || user?.displayName || 'Hiring Team'}`);
+  };
+
+  const handleSendCandidateEmailSubmit = async (e) => {
+    e.preventDefault();
+    if (!candidateEmailMessage.trim()) {
+      addToast('Please write a message to the candidate.', 'error');
+      return;
+    }
+    setCandidateEmailSending(true);
+    try {
+      await dbService.sendContactMessage({
+        name: cName || user?.displayName || 'Company Recruiter',
+        email: user?.email || cEmail,
+        to_email: selectedEmailApplicant.email,
+        subject: candidateEmailSubject.trim(),
+        message: `Employer: ${cName || user?.displayName || 'SkillGrad Hiring Partner'}\nCompany Contact: ${user?.email || cEmail}\nCandidate Name: ${selectedEmailApplicant.name}\nCandidate Email: ${selectedEmailApplicant.email}\nRole: ${selectedEmailApplicant.jobTitle || 'Internship'}\n\nMessage Content:\n${candidateEmailMessage.trim()}`
+      });
+      addToast(`Direct email sent to ${selectedEmailApplicant.name} (${selectedEmailApplicant.email})!`, 'success');
+      setSelectedEmailApplicant(null);
+      setCandidateEmailSubject('');
+      setCandidateEmailMessage('');
+    } catch {
+      addToast('Error sending message. Please try again.', 'error');
+    } finally {
+      setCandidateEmailSending(false);
+    }
   };
 
   const filteredApplications = applications.filter(app => {
@@ -495,13 +533,14 @@ export default function CompanyDashboard() {
                               Accept
                             </button>
                           )}
-                          <a
-                            href={`mailto:${app.email}?subject=SkillGrad - ${encodeURIComponent(app.jobTitle || 'Internship')}`}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 transition-all"
-                            title="Email candidate"
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEmailModal(app)}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-cyan-600 hover:text-white text-cyan-300 transition-all cursor-pointer border border-cyan-500/20 active:scale-95 flex items-center justify-center"
+                            title="Direct Message / Email Candidate"
                           >
                             <Mail className="w-3.5 h-3.5" />
-                          </a>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -780,6 +819,90 @@ export default function CompanyDashboard() {
                 {cSubmitting ? 'Publishing...' : 'Publish Internship'}
               </button>
             </form>
+          </div>
+        )}
+
+        {/* ===== Modal: Direct Message / Email Candidate ===== */}
+        {selectedEmailApplicant && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+            <div 
+              className="relative w-full max-w-lg glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl animate-scale-in"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setSelectedEmailApplicant(null)}
+                className="absolute top-5 right-5 text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="mb-5">
+                <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-cyan-400 mb-1">
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>Direct Communication Desk</span>
+                </div>
+                <h3 className="text-xl font-bold font-display text-white">
+                  Message {selectedEmailApplicant.name}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Sending to <strong className="text-cyan-300 font-mono">{selectedEmailApplicant.email}</strong> regarding <strong className="text-white">{selectedEmailApplicant.jobTitle || 'Internship Application'}</strong>.
+                </p>
+              </div>
+
+              <form onSubmit={handleSendCandidateEmailSubmit} className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Subject</label>
+                  <input
+                    type="text"
+                    required
+                    value={candidateEmailSubject}
+                    onChange={(e) => setCandidateEmailSubject(e.target.value)}
+                    placeholder="Subject line..."
+                    className="w-full px-3.5 py-2 rounded-xl glass-input text-xs sm:text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Message Body *</label>
+                  <textarea
+                    rows="5"
+                    required
+                    value={candidateEmailMessage}
+                    onChange={(e) => setCandidateEmailMessage(e.target.value)}
+                    placeholder="Write your message or next steps instructions..."
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs sm:text-sm leading-relaxed"
+                  />
+                </div>
+
+                <div className="pt-2 flex items-center justify-between gap-2">
+                  <a
+                    href={`mailto:${selectedEmailApplicant.email}?subject=${encodeURIComponent(candidateEmailSubject)}&body=${encodeURIComponent(candidateEmailMessage)}`}
+                    className="text-[11px] text-slate-400 hover:text-cyan-300 underline"
+                  >
+                    Open in default mail client
+                  </a>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedEmailApplicant(null)}
+                      className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={candidateEmailSending}
+                      className="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-semibold shadow-lg shadow-cyan-600/25 flex items-center gap-1.5 cursor-pointer disabled:opacity-60 active:scale-95 transition-all"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      {candidateEmailSending ? 'Sending...' : 'Send Message'}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
           </div>
         )}
 

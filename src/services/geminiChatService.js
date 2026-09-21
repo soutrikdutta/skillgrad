@@ -42,8 +42,15 @@ SkillGrad connects college students and emerging tech talent with verified compa
 - Format responses cleanly with bold text, bullet points, and markdown.
 - When students ask how to get started, guide them to explore the Opportunities section and sign in.
 - When employers ask how to hire, explain how to post a role in the Hiring Partner portal.
-- Provide expert tech advice, resume bullet point tips, and interview guidance when asked.
-- Always maintain the GradBot / SkillGrad identity.`;
+- Provide internship-specific resume tips and interview guidance when asked.
+- You may give brief career advice and tech skill suggestions that directly relate to landing internships.
+- Always maintain the GradBot / SkillGrad identity.
+
+### STRICT TOPIC BOUNDARIES (MANDATORY):
+- You MUST ONLY answer questions related to: SkillGrad platform features, internships, career guidance for internships, resume tips for internship applications, tech skills needed for SkillGrad roles, certificate verification, and the hiring process.
+- If a user asks something COMPLETELY UNRELATED to the above topics (e.g., general knowledge, math homework, recipes, entertainment, politics, jokes, coding assignments not related to internships), you MUST politely decline with something like: "I appreciate your curiosity! 😊 However, I'm GradBot — your SkillGrad career assistant, and I'm trained exclusively to help with internships, career growth, and platform features. Try asking me about applying for roles, tracking applications, or verifying certificates!"
+- You MAY provide brief supplementary suggestions about technologies or skills if they are directly relevant to landing internships listed on SkillGrad.
+- NEVER answer general coding questions, trivia, creative writing prompts, or anything outside the SkillGrad ecosystem.`;
 
 export const SUGGESTED_PROMPTS = [
   { id: 1, text: "🎓 How do I apply for paid internships?", icon: "briefcase" },
@@ -119,6 +126,19 @@ export async function sendChatMessage(chatHistory, userMessage, customApiKey = n
 // Fallback response generator trained specifically for SkillGrad
 export function getFallbackResponse(query) {
   const q = (query || '').toLowerCase();
+
+  // Strict check: if the question is off-topic and unrelated to SkillGrad/internships/careers
+  const skillKeywords = [
+    'skillgrad', 'intern', 'job', 'apply', 'career', 'resume', 'certif', 'serial', 'verify',
+    'post', 'hire', 'employer', 'company', 'stipend', 'student', 'talent', 'status', 'portal',
+    'project', 'hr', 'contact', 'mentor', 'dev', 'web', 'ai', 'cloud', 'design', 'code', 'help',
+    'hello', 'hi', 'hey', 'start', 'how'
+  ];
+  const isRelevant = skillKeywords.some(kw => q.includes(kw));
+
+  if (!isRelevant && q.length > 5) {
+    return `I appreciate your curiosity! 😊 However, I'm **GradBot** — your dedicated **SkillGrad career & platform assistant**.\n\nI am trained exclusively to answer questions about:\n- 🎓 **Finding and applying to 100% paid tech internships**\n- 📜 **Verifying official certificates via Serial Numbers**\n- 🏢 **Posting openings and evaluating student applicants**\n- 💡 **Internship skills, resume tips, and onboarding**\n\n*Please ask any question related to SkillGrad or your internship journey!*`;
+  }
 
   if (q.includes('apply') || q.includes('find') || q.includes('internship')) {
     return `### How to Apply for Internships on SkillGrad 🎓\n\n1. **Browse Opportunities**: Head to the **Opportunities** section to explore 100% paid internships across Web Dev, AI/ML, Cloud, and UI/UX.\n2. **Review Details**: Check the required skills, duration, stipend, and project requirements.\n3. **One-Click Apply**: Click **"Apply Now"** to submit your verified profile directly to hiring managers.\n4. **Track Status**: Monitor real-time status in **"My Applications"** (Applied, Under Review, Accepted, or Rejected).`;

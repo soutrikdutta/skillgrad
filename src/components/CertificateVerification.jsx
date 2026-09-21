@@ -164,7 +164,7 @@ export default function CertificateVerification() {
               <X className="w-5 h-5" />
             </button>
 
-            <div className="border-2 border-amber-500/40 p-6 sm:p-8 rounded-2xl bg-gradient-to-b from-slate-950/90 to-slate-900/90 text-center space-y-4">
+            <div id="certificate-print-area" className="border-2 border-amber-500/40 p-6 sm:p-8 rounded-2xl bg-gradient-to-b from-slate-950/90 to-slate-900/90 text-center space-y-4">
               <div className="text-xs uppercase tracking-[0.3em] font-bold text-amber-400">
                 Official Credential
               </div>

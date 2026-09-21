@@ -1,18 +1,51 @@
+import { db } from './config';
+import { 
+  collection, 
+  doc, 
+  addDoc, 
+  getDocs, 
+  getDoc, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  where, 
+  orderBy 
+} from 'firebase/firestore';
+
 const POSTED_JOBS_KEY = 'skillgrad_posted_internships';
 const APPS_KEY = 'skillgrad_applications';
+const CERTS_KEY = 'skillgrad_certificates';
 
 export const dbService = {
-  // 1. Public Marketplace: returns real jobs from backend database
+  // ==========================================
+  // 1. PUBLIC MARKETPLACE / LIVE INTERNSHIPS
+  // ==========================================
   async fetchLiveInternships() {
     try {
-      const res = await fetch('/api/internships');
-      if (res.ok) {
-        const data = await res.json();
-        localStorage.setItem(POSTED_JOBS_KEY, JSON.stringify(data));
-        return data;
+      if (db) {
+        const colRef = collection(db, 'internships');
+        let snap;
+        try {
+          const q = query(colRef, orderBy('postedAt', 'desc'));
+          snap = await getDocs(q);
+        } catch {
+          // If index not ready, fallback to unsorted query
+          snap = await getDocs(colRef);
+        }
+
+        const liveList = snap.docs.map(d => ({
+          id: d.id,
+          ...d.data()
+        }));
+
+        // Sort descending by postedAt in case fallback was used
+        liveList.sort((a, b) => new Date(b.postedAt || 0) - new Date(a.postedAt || 0));
+
+        localStorage.setItem(POSTED_JOBS_KEY, JSON.stringify(liveList));
+        return liveList;
       }
     } catch (err) {
-      console.warn('API fetch warning, using local cache:', err.message);
+      console.warn('Firestore fetchLiveInternships note, using local cache:', err.message);
     }
     return this.getInternships();
   },
@@ -25,16 +58,26 @@ export const dbService = {
     }
   },
 
-  // 2. Isolated Company Postings: queries backend by user email
+  // ==========================================
+  // 2. COMPANY INTERNSHIP POSTINGS
+  // ==========================================
   async fetchCompanyPostings(user) {
     if (!user || !user.email) return [];
+    const userEmail = (user.email || '').toLowerCase().trim();
+    const userUid = user.uid;
+
     try {
-      const res = await fetch(`/api/internships/company/${encodeURIComponent(user.email)}`);
-      if (res.ok) {
-        return await res.json();
+      if (db) {
+        const allJobs = await this.fetchLiveInternships();
+        return allJobs.filter(job => {
+          const matchesUid = job.creatorId && job.creatorId === userUid;
+          const matchesCreatorEmail = job.creatorEmail && job.creatorEmail.toLowerCase().trim() === userEmail;
+          const matchesContactEmail = job.contactEmail && job.contactEmail.toLowerCase().trim() === userEmail;
+          return matchesUid || matchesCreatorEmail || matchesContactEmail;
+        });
       }
     } catch (err) {
-      console.warn('API company postings warning:', err.message);
+      console.warn('Firestore fetchCompanyPostings note:', err.message);
     }
     return this.getCompanyPostings(user);
   },
@@ -53,16 +96,28 @@ export const dbService = {
     });
   },
 
-  // 3. Isolated Applicants View: queries backend by user email
+  // ==========================================
+  // 3. COMPANY APPLICANTS VIEW
+  // ==========================================
   async fetchCompanyApplicants(user) {
     if (!user || !user.email) return [];
     try {
-      const res = await fetch(`/api/applications/company/${encodeURIComponent(user.email)}`);
-      if (res.ok) {
-        return await res.json();
+      if (db) {
+        const companyJobs = await this.fetchCompanyPostings(user);
+        const companyJobIds = new Set(companyJobs.map(j => j.id));
+
+        const snap = await getDocs(collection(db, 'applications'));
+        const allApps = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        const filtered = allApps.filter(app => companyJobIds.has(app.jobId));
+        filtered.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+
+        // Update local cache
+        localStorage.setItem(APPS_KEY, JSON.stringify(allApps));
+        return filtered;
       }
     } catch (err) {
-      console.warn('API company applicants warning:', err.message);
+      console.warn('Firestore fetchCompanyApplicants note:', err.message);
     }
     return this.getCompanyApplicants(user);
   },
@@ -80,10 +135,13 @@ export const dbService = {
     }
   },
 
-  // 4. Post an Internship: persists to Cloud SQL backend
+  // ==========================================
+  // 4. POST AN INTERNSHIP (SHARED FIRESTORE)
+  // ==========================================
   async postInternship(jobData, currentUser = null) {
     const creatorId = currentUser?.uid || jobData.creatorId || 'anon-' + Date.now();
-    const creatorEmail = currentUser?.email || jobData.contactEmail || '';
+    const creatorEmail = (currentUser?.email || jobData.contactEmail || '').toLowerCase().trim();
+    const contactEmail = (jobData.contactEmail || creatorEmail).toLowerCase().trim();
 
     const payload = {
       title: jobData.title,
@@ -101,34 +159,32 @@ export const dbService = {
       openings: 2,
       creatorId,
       creatorEmail,
-      contactEmail: jobData.contactEmail || creatorEmail
+      contactEmail,
+      applicantsCount: 0,
+      isNew: true,
+      postedAt: new Date().toISOString()
     };
 
     try {
-      const res = await fetch('/api/internships', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const createdJob = { ...payload, id: data.id, applicantsCount: 0, isNew: true, postedAt: new Date().toISOString() };
-        
+      if (db) {
+        const docRef = await addDoc(collection(db, 'internships'), payload);
+        const createdJob = { ...payload, id: docRef.id };
+
         // Update local cache
         const existing = this.getInternships();
         existing.unshift(createdJob);
         localStorage.setItem(POSTED_JOBS_KEY, JSON.stringify(existing));
 
         window.dispatchEvent(new CustomEvent('skillgrad_internship_posted', { detail: createdJob }));
-        return { success: true, id: data.id, internship: createdJob };
+        return { success: true, id: docRef.id, internship: createdJob };
       }
     } catch (err) {
-      console.warn('API post error, saving locally:', err.message);
+      console.warn('Firestore post error, saving locally:', err.message);
     }
 
     // Local fallback
     const fallbackId = 'sg-posted-' + Date.now();
-    const fallbackJob = { ...payload, id: fallbackId, applicantsCount: 0, isNew: true, postedAt: new Date().toISOString() };
+    const fallbackJob = { ...payload, id: fallbackId };
     const existing = this.getInternships();
     existing.unshift(fallbackJob);
     localStorage.setItem(POSTED_JOBS_KEY, JSON.stringify(existing));
@@ -136,24 +192,19 @@ export const dbService = {
     return { success: true, id: fallbackId, internship: fallbackJob };
   },
 
-  // 5. Delete an Internship Posting
+  // ==========================================
+  // 5. DELETE AN INTERNSHIP
+  // ==========================================
   async deleteInternship(jobId) {
     try {
-      const res = await fetch(`/api/internships/${encodeURIComponent(jobId)}`, { method: 'DELETE' });
-      if (res.ok) {
-        // Also clean local cache
-        const allJobs = this.getInternships().filter(j => j.id !== jobId);
-        localStorage.setItem(POSTED_JOBS_KEY, JSON.stringify(allJobs));
-        // Also remove related applications
-        const allApps = JSON.parse(localStorage.getItem(APPS_KEY) || '[]').filter(a => a.jobId !== jobId);
-        localStorage.setItem(APPS_KEY, JSON.stringify(allApps));
-        window.dispatchEvent(new CustomEvent('skillgrad_internship_deleted'));
-        return { success: true };
+      if (db && jobId && !jobId.startsWith('sg-posted-')) {
+        await deleteDoc(doc(db, 'internships', jobId));
       }
     } catch (err) {
-      console.warn('API delete error, removing locally:', err.message);
+      console.warn('Firestore delete error:', err.message);
     }
-    // Local fallback
+
+    // Clean local cache
     const allJobs = this.getInternships().filter(j => j.id !== jobId);
     localStorage.setItem(POSTED_JOBS_KEY, JSON.stringify(allJobs));
     const allApps = JSON.parse(localStorage.getItem(APPS_KEY) || '[]').filter(a => a.jobId !== jobId);
@@ -162,57 +213,67 @@ export const dbService = {
     return { success: true };
   },
 
-  // 6. Submit Student Application: persists to Cloud SQL backend
+  // ==========================================
+  // 6. SUBMIT STUDENT APPLICATION
+  // ==========================================
   async submitApplication(applicationData) {
-    const appPayload = { ...applicationData, status: 'pending' };
+    const appPayload = { 
+      ...applicationData, 
+      status: 'pending',
+      submittedAt: new Date().toISOString()
+    };
+
     try {
-      const res = await fetch('/api/applications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(appPayload)
-      });
-      if (res.ok) {
-        const data = await res.json();
+      if (db) {
+        const docRef = await addDoc(collection(db, 'applications'), appPayload);
         
+        // Increment applicant count on the internship in Firestore
+        try {
+          if (applicationData.jobId) {
+            const jobDocRef = doc(db, 'internships', applicationData.jobId);
+            const jobSnap = await getDoc(jobDocRef);
+            if (jobSnap.exists()) {
+              const currentCount = jobSnap.data().applicantsCount || 0;
+              await updateDoc(jobDocRef, { applicantsCount: currentCount + 1 });
+            }
+          }
+        } catch (cntErr) {
+          console.warn('Could not increment applicant count:', cntErr.message);
+        }
+
         // Update local app cache
         const existing = JSON.parse(localStorage.getItem(APPS_KEY) || '[]');
-        existing.push({ ...appPayload, id: data.id, submittedAt: new Date().toISOString() });
+        existing.push({ ...appPayload, id: docRef.id });
         localStorage.setItem(APPS_KEY, JSON.stringify(existing));
 
         window.dispatchEvent(new CustomEvent('skillgrad_application_submitted', { detail: { jobId: applicationData.jobId } }));
-        return { success: true, id: data.id };
+        return { success: true, id: docRef.id };
       }
     } catch (err) {
-      console.warn('API application submit error, saving locally:', err.message);
+      console.warn('Firestore application submit error, saving locally:', err.message);
     }
 
     // Local fallback
     const id = 'app-' + Date.now();
     const existing = JSON.parse(localStorage.getItem(APPS_KEY) || '[]');
-    existing.push({ ...appPayload, id, submittedAt: new Date().toISOString() });
+    existing.push({ ...appPayload, id });
     localStorage.setItem(APPS_KEY, JSON.stringify(existing));
     window.dispatchEvent(new CustomEvent('skillgrad_application_submitted', { detail: { jobId: applicationData.jobId } }));
     return { success: true, id };
   },
 
-  // 7. Update Application Status (accept / reject) — company action
+  // ==========================================
+  // 7. UPDATE APPLICATION STATUS (COMPANY ACTION)
+  // ==========================================
   async updateApplicationStatus(applicationId, newStatus) {
     try {
-      const res = await fetch(`/api/applications/${encodeURIComponent(applicationId)}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
-      });
-      if (res.ok) {
-        // Update local cache
-        this._updateLocalAppStatus(applicationId, newStatus);
-        window.dispatchEvent(new CustomEvent('skillgrad_application_status_changed'));
-        return { success: true };
+      if (db && applicationId && !applicationId.startsWith('app-')) {
+        await updateDoc(doc(db, 'applications', applicationId), { status: newStatus });
       }
     } catch (err) {
-      console.warn('API status update error, updating locally:', err.message);
+      console.warn('Firestore status update error:', err.message);
     }
-    // Local fallback
+
     this._updateLocalAppStatus(applicationId, newStatus);
     window.dispatchEvent(new CustomEvent('skillgrad_application_status_changed'));
     return { success: true };
@@ -226,7 +287,9 @@ export const dbService = {
     } catch {}
   },
 
-  // 8. Get Student's Own Applications (by email or userId)
+  // ==========================================
+  // 8. STUDENT APPLICATIONS
+  // ==========================================
   getStudentApplications(user) {
     if (!user) return [];
     const userEmail = (user.email || '').toLowerCase().trim();
@@ -245,67 +308,99 @@ export const dbService = {
 
   async fetchStudentApplications(user) {
     if (!user || !user.email) return [];
+    const userEmail = (user.email || '').toLowerCase().trim();
+    const userId = user.uid;
+
     try {
-      const res = await fetch(`/api/applications/student/${encodeURIComponent(user.email)}`);
-      if (res.ok) {
-        return await res.json();
+      if (db) {
+        const snap = await getDocs(collection(db, 'applications'));
+        const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const studentApps = all.filter(app => {
+          const matchEmail = app.email && app.email.toLowerCase().trim() === userEmail;
+          const matchUid = app.userId && app.userId === userId;
+          return matchEmail || matchUid;
+        });
+        studentApps.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+        return studentApps;
       }
     } catch (err) {
-      console.warn('API student apps warning:', err.message);
+      console.warn('Firestore student apps warning:', err.message);
     }
     return this.getStudentApplications(user);
   },
 
-  // 9. Send Contact Message
+  // ==========================================
+  // 9. SEND CONTACT / HR MESSAGE (WEB3FORMS API)
+  // ==========================================
   async sendContactMessage(formData) {
     try {
-      const res = await fetch('/api/contact', {
+      const res = await fetch('https://api.web3forms.com/submit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          access_key: 'b94e3cb2-9386-4f7f-856c-2f9ec6fb4018',
+          from_name: formData.name || 'SkillGrad Portal User',
+          subject: formData.subject || `SkillGrad Inquiry from ${formData.name || 'User'}`,
+          email: formData.email,
+          message: formData.message,
+          to_email: formData.to_email || '2006soutrik@gmail.com',
+          timestamp: new Date().toLocaleString()
+        })
       });
+
       if (res.ok) {
-        return { success: true, message: 'Your message has been sent directly to 2006soutrik@gmail.com!' };
+        return { success: true, message: 'Your message has been sent directly!' };
       }
     } catch (err) {
-      console.warn('API contact error:', err.message);
+      console.warn('Contact message error:', err.message);
     }
 
-    return { success: true, message: 'Your message has been recorded and forwarded!' };
+    return { success: true, message: 'Your message has been dispatched!' };
   },
 
-  // 10. Certificate Engine: Issue Certificate (Company)
+  // ==========================================
+  // 10. CERTIFICATE ENGINE: ISSUE CERTIFICATE
+  // ==========================================
   async issueCertificate(certData) {
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
     const serialNumber = certData.serialNumber || `SG-${new Date().getFullYear()}-${randomSuffix}`;
     const payload = {
       ...certData,
       serialNumber,
-      issueDate: certData.issueDate || new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+      studentEmail: (certData.studentEmail || '').toLowerCase().trim(),
+      companyEmail: (certData.companyEmail || '').toLowerCase().trim(),
+      issueDate: certData.issueDate || new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+      createdAt: new Date().toISOString()
     };
 
     try {
-      const res = await fetch('/api/certificates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const created = data.certificate || { ...payload, id: data.id };
+      if (db) {
+        const docRef = await addDoc(collection(db, 'certificates'), payload);
+        const created = { ...payload, id: docRef.id };
         this._saveLocalCert(created);
         window.dispatchEvent(new CustomEvent('skillgrad_certificate_issued', { detail: created }));
-        return { success: true, serialNumber: data.serialNumber, certificate: created };
+        
+        // Notify author of certificate issuance
+        this.sendContactMessage({
+          name: 'SkillGrad Certificate Mint',
+          email: certData.companyEmail || 'certs@skillgrad.org',
+          subject: `SkillGrad Credential Issued: ${serialNumber} to ${certData.studentName}`,
+          message: `Serial: ${serialNumber}\nRecipient: ${certData.studentName} (${certData.studentEmail})\nRole: ${certData.roleTitle}\nCompany: ${certData.companyName}\nGrade: ${certData.grade}`
+        }).catch(() => {});
+
+        return { success: true, serialNumber, certificate: created };
       }
     } catch (err) {
-      console.warn('API certificate issue error, saving locally:', err.message);
+      console.warn('Firestore certificate issue error, saving locally:', err.message);
     }
 
     // Local fallback
     const fallbackCert = {
       ...payload,
-      id: 'cert-' + Date.now(),
-      createdAt: new Date().toISOString()
+      id: 'cert-' + Date.now()
     };
     this._saveLocalCert(fallbackCert);
     window.dispatchEvent(new CustomEvent('skillgrad_certificate_issued', { detail: fallbackCert }));
@@ -314,30 +409,35 @@ export const dbService = {
 
   _saveLocalCert(cert) {
     try {
-      const existing = JSON.parse(localStorage.getItem('skillgrad_certificates') || '[]');
+      const existing = JSON.parse(localStorage.getItem(CERTS_KEY) || '[]');
       existing.unshift(cert);
-      localStorage.setItem('skillgrad_certificates', JSON.stringify(existing));
+      localStorage.setItem(CERTS_KEY, JSON.stringify(existing));
     } catch {}
   },
 
-  // 11. Verify Certificate by Serial Number (API + Local fallback)
+  // ==========================================
+  // 11. VERIFY CERTIFICATE BY SERIAL NUMBER
+  // ==========================================
   async verifyCertificate(serialNumber) {
     const cleanSn = (serialNumber || '').toUpperCase().trim();
     if (!cleanSn) return null;
 
     try {
-      const res = await fetch(`/api/certificates/${encodeURIComponent(cleanSn)}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.serialNumber) return data;
+      if (db) {
+        const q = query(collection(db, 'certificates'), where('serialNumber', '==', cleanSn));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const docData = snap.docs[0].data();
+          return { id: snap.docs[0].id, ...docData };
+        }
       }
     } catch (err) {
-      console.warn('API verify warning, checking local:', err.message);
+      console.warn('Firestore verify warning, checking local:', err.message);
     }
 
     // Check local fallback
     try {
-      const certs = JSON.parse(localStorage.getItem('skillgrad_certificates') || '[]');
+      const certs = JSON.parse(localStorage.getItem(CERTS_KEY) || '[]');
       const found = certs.find(c => (c.serialNumber || c.serial_number || '').toUpperCase().trim() === cleanSn);
       if (found) return found;
     } catch {}
@@ -345,53 +445,63 @@ export const dbService = {
     return null;
   },
 
-  // 12. Fetch Student Certificates
+  // ==========================================
+  // 12. FETCH STUDENT CERTIFICATES
+  // ==========================================
   async fetchStudentCertificates(user) {
     if (!user || !user.email) return [];
     const email = user.email.toLowerCase().trim();
 
     try {
-      const res = await fetch(`/api/certificates/student/${encodeURIComponent(email)}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) return data;
+      if (db) {
+        const q = query(collection(db, 'certificates'), where('studentEmail', '==', email));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        }
       }
     } catch (err) {
-      console.warn('API student certs warning:', err.message);
+      console.warn('Firestore student certs warning:', err.message);
     }
 
     try {
-      const certs = JSON.parse(localStorage.getItem('skillgrad_certificates') || '[]');
+      const certs = JSON.parse(localStorage.getItem(CERTS_KEY) || '[]');
       return certs.filter(c => (c.studentEmail || c.student_email || '').toLowerCase().trim() === email);
     } catch {
       return [];
     }
   },
 
-  // 13. Fetch Company Issued Certificates
+  // ==========================================
+  // 13. FETCH COMPANY ISSUED CERTIFICATES
+  // ==========================================
   async fetchCompanyCertificates(user) {
     if (!user || !user.email) return [];
     const email = user.email.toLowerCase().trim();
 
     try {
-      const res = await fetch(`/api/certificates/company/${encodeURIComponent(email)}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) return data;
+      if (db) {
+        const q = query(collection(db, 'certificates'), where('companyEmail', '==', email));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        }
       }
     } catch (err) {
-      console.warn('API company certs warning:', err.message);
+      console.warn('Firestore company certs warning:', err.message);
     }
 
     try {
-      const certs = JSON.parse(localStorage.getItem('skillgrad_certificates') || '[]');
+      const certs = JSON.parse(localStorage.getItem(CERTS_KEY) || '[]');
       return certs.filter(c => (c.companyEmail || c.company_email || '').toLowerCase().trim() === email);
     } catch {
       return [];
     }
   },
 
-  // 14. Get Joined / Accepted Internships for Student
+  // ==========================================
+  // 14. GET JOINED / ACCEPTED INTERNSHIPS
+  // ==========================================
   async getJoinedInternships(user) {
     if (!user || !user.email) return [];
     const userEmail = (user.email || '').toLowerCase().trim();
@@ -399,10 +509,7 @@ export const dbService = {
 
     let apps = [];
     try {
-      const res = await fetch(`/api/applications/student/${encodeURIComponent(userEmail)}`);
-      if (res.ok) {
-        apps = await res.json();
-      }
+      apps = await this.fetchStudentApplications(user);
     } catch {}
 
     if (!apps || apps.length === 0) {
@@ -418,7 +525,7 @@ export const dbService = {
 
     // Filter to accepted ones only
     const acceptedApps = apps.filter(a => a.status === 'accepted');
-    const allJobs = this.getInternships();
+    const allJobs = await this.fetchLiveInternships();
     const jobsMap = {};
     allJobs.forEach(j => { jobsMap[j.id] = j; });
 

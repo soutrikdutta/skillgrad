@@ -454,3 +454,91 @@ body {
     line-height: 1.4;
   }
 }
+
+/* ===================== Print Styles — Certificate Only ===================== */
+@media print {
+  /* Hide the entire page content */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* Show only the certificate print area and its children */
+  #certificate-print-area,
+  #certificate-print-area * {
+    visibility: visible !important;
+  }
+
+  /* Position the certificate to fill the page */
+  #certificate-print-area {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    padding: 2.5rem !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+    z-index: 99999 !important;
+    border: 3px solid #d97706 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+  }
+
+  /* Make all text dark and readable on white background */
+  #certificate-print-area h2,
+  #certificate-print-area h3,
+  #certificate-print-area strong {
+    color: #111827 !important;
+    -webkit-text-fill-color: #111827 !important;
+    background: none !important;
+    background-clip: unset !important;
+    -webkit-background-clip: unset !important;
+  }
+
+  #certificate-print-area span,
+  #certificate-print-area p,
+  #certificate-print-area div {
+    color: #374151 !important;
+    background: transparent !important;
+  }
+
+  #certificate-print-area .text-amber-300,
+  #certificate-print-area .text-amber-400 {
+    color: #b45309 !important;
+  }
+
+  #certificate-print-area .text-emerald-400 {
+    color: #059669 !important;
+  }
+
+  /* Force borders to be visible */
+  #certificate-print-area [class*="border"] {
+    border-color: #d1d5db !important;
+  }
+
+  /* Hide decorative blurs and watermarks */
+  #certificate-print-area .bg-grid-pattern,
+  #certificate-print-area .blur-3xl,
+  #certificate-print-area .filter {
+    display: none !important;
+  }
+
+  /* Hide background animations and overlays */
+  .bg-black\/85,
+  .bg-black\/80,
+  .backdrop-blur-md {
+    background: transparent !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Ensure single page */
+  @page {
+    size: A4 landscape;
+    margin: 0.5cm;
+  }
+}
